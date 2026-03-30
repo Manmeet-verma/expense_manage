@@ -348,6 +348,8 @@ export async function updateUserBudget(newBudget: number) {
   })
 
   revalidatePath("/dashboard")
+  revalidatePath("/admin")
+  revalidatePath("/admin/members")
 
   return { success: true, totalBudget: updated.totalBudget }
 }

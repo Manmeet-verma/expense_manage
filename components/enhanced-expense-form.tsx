@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createExpense } from "@/actions/expense"
+import { updateUserBudget } from "@/actions/expense"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -67,10 +68,18 @@ export function EnhancedExpenseForm({
       return
     }
 
-    // Allow the edit locally (submitted expense is now editable by member)
+    const result = await updateUserBudget(newSubmitted)
+    if (result?.error) {
+      setSubmittedError(result.error)
+      setSubmittedLoading(false)
+      return
+    }
+
     setLiveSubmittedAmount(newSubmitted)
     setSubmittedEditValue(newSubmitted.toString())
     setEditingSubmitted(false)
+    void broadcastExpenseChange("member-budget-update")
+    router.refresh()
     setSubmittedLoading(false)
   }
   const totalAfterExpense = liveTotalAmountUsed + expenseAmount

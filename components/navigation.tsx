@@ -35,6 +35,12 @@ export function Navigation({ user }: NavProps) {
       visible: isAdmin,
     },
     {
+      href: "/admin/members",
+      label: "Members",
+      icon: Users,
+      visible: isAdmin,
+    },
+    {
       href: "/change-password",
       label: "Change Password",
       icon: KeyRound,

@@ -37,7 +37,7 @@ export default async function DashboardPage() {
           </div>
           <MemberExpenseList
             expenses={expenses}
-            submittedExpenseAmount={stats?.totalPaidAmount || 0}
+            submittedExpenseAmount={stats?.totalBudget || 0}
             totalAmountUsed={stats?.submittedAmount || 0}
           />
         </div>
@@ -45,7 +45,7 @@ export default async function DashboardPage() {
           {stats && (
             <EnhancedExpenseForm
               memberName={session.user.name || "Member"}
-              submittedExpenseAmount={stats.totalPaidAmount || 0}
+              submittedExpenseAmount={stats.totalBudget || 0}
               totalAmountUsed={stats.submittedAmount || 0}
             />
           )}
