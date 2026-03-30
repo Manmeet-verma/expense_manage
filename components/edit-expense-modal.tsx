@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { updateExpense } from "@/actions/expense"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,6 +41,7 @@ const CATEGORIES = [
 ]
 
 export function EditExpenseModal({ expense, submittedExpenseAmount, totalAmountUsed, isOpen, onClose, onSuccess }: EditExpenseModalProps) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [formData, setFormData] = useState({
@@ -71,6 +73,7 @@ export function EditExpenseModal({ expense, submittedExpenseAmount, totalAmountU
       setError(result.error)
       setLoading(false)
     } else {
+      router.refresh()
       onClose()
       onSuccess?.()
     }
@@ -138,7 +141,7 @@ export function EditExpenseModal({ expense, submittedExpenseAmount, totalAmountU
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount ($)</Label>
+                <Label htmlFor="amount">Amount (INR)</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -146,7 +149,7 @@ export function EditExpenseModal({ expense, submittedExpenseAmount, totalAmountU
                   min="0"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  placeholder="0.00"
+                  placeholder="₹0.00"
                   required
                 />
               </div>

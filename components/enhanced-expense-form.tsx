@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { createExpense } from "@/actions/expense"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +31,7 @@ export function EnhancedExpenseForm({
   totalAmountUsed,
   onSuccess 
 }: EnhancedExpenseFormProps) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [expenseAmount, setExpenseAmount] = useState(0)
@@ -92,7 +94,9 @@ export function EnhancedExpenseForm({
     } else {
       e.currentTarget.reset()
       setExpenseAmount(0)
+      router.refresh()
       if (onSuccess) onSuccess()
+      setLoading(false)
     }
   }
 
@@ -241,14 +245,14 @@ export function EnhancedExpenseForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Expense Amount ($) *</Label>
+            <Label htmlFor="amount">Expense Amount (INR) *</Label>
             <Input
               id="amount"
               name="amount"
               type="number"
               step="0.01"
               min="0"
-              placeholder="0.00"
+              placeholder="₹0.00"
               onChange={(e) => setExpenseAmount(parseFloat(e.target.value) || 0)}
               required
             />

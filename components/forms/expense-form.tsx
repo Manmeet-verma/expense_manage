@@ -96,14 +96,14 @@ export function ExpenseForm({ expense, onSuccess }: ExpenseFormProps) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount ($)</Label>
+            <Label htmlFor="amount">Amount (INR)</Label>
             <Input
               id="amount"
               name="amount"
               type="number"
               step="0.01"
               min="0"
-              placeholder="0.00"
+                placeholder="₹0.00"
               defaultValue={expense?.amount}
               required
             />

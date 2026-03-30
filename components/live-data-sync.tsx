@@ -7,17 +7,28 @@ interface LiveDataSyncProps {
   intervalMs?: number
 }
 
-export function LiveDataSync({ intervalMs = 5000 }: LiveDataSyncProps) {
+export function LiveDataSync({ intervalMs = 3000 }: LiveDataSyncProps) {
   const router = useRouter()
 
   useEffect(() => {
+    const handleVisible = () => {
+      if (document.visibilityState === "visible") {
+        router.refresh()
+      }
+    }
+
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         router.refresh()
       }
     }, intervalMs)
 
-    return () => window.clearInterval(timer)
+    document.addEventListener("visibilitychange", handleVisible)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisible)
+      window.clearInterval(timer)
+    }
   }, [intervalMs, router])
 
   return null

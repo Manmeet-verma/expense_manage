@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { deleteExpense } from "@/actions/expense"
 import { ExpenseList } from "@/components/expense-list"
 import { EditExpenseModal } from "@/components/edit-expense-modal"
@@ -30,6 +31,7 @@ interface MemberExpenseListProps {
 }
 
 export function MemberExpenseList({ expenses, submittedExpenseAmount, totalAmountUsed }: MemberExpenseListProps) {
+  const router = useRouter()
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -39,7 +41,10 @@ export function MemberExpenseList({ expenses, submittedExpenseAmount, totalAmoun
   async function handleDelete() {
     if (!deletingExpenseId) return
     setIsDeleting(true)
-    await deleteExpense(deletingExpenseId)
+    const result = await deleteExpense(deletingExpenseId)
+    if (result?.success) {
+      router.refresh()
+    }
     setIsDeleting(false)
     setDeletingExpenseId(null)
   }
@@ -61,7 +66,7 @@ export function MemberExpenseList({ expenses, submittedExpenseAmount, totalAmoun
           onClose={() => setEditingExpense(null)}
           onSuccess={() => {
             setEditingExpense(null)
-            // Page will revalidate automatically via server action
+            router.refresh()
           }}
         />
       )}
