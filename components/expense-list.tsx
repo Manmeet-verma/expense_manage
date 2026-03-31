@@ -4,8 +4,9 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { ExpenseStatus } from "@prisma/client"
 import { Edit, Trash2, Check, X } from "lucide-react"
+
+import { ExpenseStatus } from "@/lib/types"
 
 interface Expense {
   id: string

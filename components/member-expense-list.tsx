@@ -7,7 +7,15 @@ import { broadcastExpenseChange } from "@/lib/supabase/realtime"
 import { ExpenseList } from "@/components/expense-list"
 import { EditExpenseModal } from "@/components/edit-expense-modal"
 import { DeleteExpenseConfirm } from "@/components/delete-expense-confirm"
-import { ExpenseStatus } from "@prisma/client"
+
+const ExpenseStatus = {
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+  PAID: "PAID",
+} as const
+
+type ExpenseStatus = (typeof ExpenseStatus)[keyof typeof ExpenseStatus]
 
 interface Expense {
   id: string

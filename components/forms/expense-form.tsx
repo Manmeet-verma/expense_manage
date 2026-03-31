@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ExpenseCategory } from "@prisma/client"
+import { ExpenseCategory } from "@/lib/types"
 
 interface ExpenseFormProps {
   expense?: {
