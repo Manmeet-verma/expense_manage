@@ -18,7 +18,7 @@ export default async function DashboardLayout({
     <>
       <Navigation user={session.user} />
       <main className="flex-1">
-        <LiveDataSync intervalMs={5000} />
+        <LiveDataSync />
         {children}
       </main>
     </>
