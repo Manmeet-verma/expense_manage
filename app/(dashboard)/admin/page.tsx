@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { KeyRound } from "lucide-react"
 
+type Expense = Awaited<ReturnType<typeof getAllExpenses>>[number]
+
 function formatCategory(category: string): string {
   return category
     .toLowerCase()
@@ -41,7 +43,7 @@ export default async function AdminPage() {
   ])
 
   const memberExpenseSummary = expenses.reduce<Record<string, { submittedByAdmin: number; totalUsed: number }>>(
-    (acc: Record<string, { submittedByAdmin: number; totalUsed: number }>, expense: typeof expenses[number]) => {
+    (acc: Record<string, { submittedByAdmin: number; totalUsed: number }>, expense: Expense) => {
       const memberId = expense.createdById
       if (!acc[memberId]) {
         acc[memberId] = {
@@ -128,7 +130,7 @@ export default async function AdminPage() {
               No expenses submitted yet
             </div>
           ) : (
-            expenses.map((expense) => (
+            expenses.map((expense: Expense) => (
               <div key={expense.id} className="rounded-lg border border-gray-200 bg-white p-4 space-y-3">
                 {(() => {
                   const summary = memberExpenseSummary[expense.createdById]
@@ -239,7 +241,7 @@ export default async function AdminPage() {
                   </td>
                 </tr>
               ) : (
-                expenses.map((expense) => {
+                expenses.map((expense: Expense) => {
                   const summary = memberExpenseSummary[expense.createdById]
                   const submittedExpense = summary?.submittedByAdmin ?? 0
                   const totalExpense = summary?.totalUsed ?? 0
