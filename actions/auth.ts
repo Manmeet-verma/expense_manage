@@ -54,6 +54,10 @@ const deleteMemberSchema = z.object({
   memberId: z.string().min(1, "Member ID is required"),
 })
 
+const deleteAdminSchema = z.object({
+  adminId: z.string().min(1, "Admin ID is required"),
+})
+
 const adminForgotPasswordSchema = z.object({
   email: z.string().email("Invalid email address"),
   newPassword: z.string().min(6, "New password must be at least 6 characters"),
@@ -269,6 +273,46 @@ export async function getAdmins() {
     },
     orderBy: { createdAt: "asc" },
   })
+}
+
+export async function deleteAdmin(data: z.infer<typeof deleteAdminSchema>) {
+  const session = await auth()
+
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return { error: "Only admins can delete admin accounts" }
+  }
+
+  const result = deleteAdminSchema.safeParse(data)
+  if (!result.success) {
+    return { error: result.error.issues[0].message }
+  }
+
+  const { adminId } = result.data
+
+  if (adminId === session.user.id) {
+    return { error: "You cannot delete your own account" }
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: adminId },
+    select: { id: true, role: true },
+  })
+
+  if (!user) {
+    return { error: "Admin not found" }
+  }
+
+  if (user.role !== "ADMIN") {
+    return { error: "Only admin accounts can be deleted" }
+  }
+
+  await prisma.user.delete({
+    where: { id: adminId },
+  })
+
+  revalidatePath("/admin")
+
+  return { success: true }
 }
 
 export async function deleteMember(data: z.infer<typeof deleteMemberSchema>) {

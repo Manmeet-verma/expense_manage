@@ -108,32 +108,7 @@ export default async function AdminPage() {
       {stats && <StatsCards stats={stats} mode="admin" />}
 
       <div className="mt-8">
-        <AdminSection />
-
-        {admins.length > 0 && (
-          <div className="mt-4 rounded-lg border border-gray-200 bg-white overflow-hidden">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-600">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Name</th>
-                  <th className="px-4 py-3 font-semibold">Email</th>
-                  <th className="px-4 py-3 font-semibold">Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {admins.map((admin) => (
-                  <tr key={admin.id} className="border-t border-gray-100">
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {admin.name || "N/A"}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">{admin.email}</td>
-                    <td className="px-4 py-3 text-gray-700">{formatDate(admin.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <AdminSection admins={admins} currentAdminId={session.user.id} />
       </div>
 
       <div className="mt-8 flex items-center justify-between gap-3">
