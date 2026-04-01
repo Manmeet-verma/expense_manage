@@ -22,8 +22,6 @@ interface StatsCardsProps {
 
 export function StatsCards({ stats, mode = "member" }: StatsCardsProps) {
   const totalExpenseAmount = stats.submittedAmount ?? 0
-  const submittedExpenseAmount = stats.totalPaidAmount ?? 0
-  const remainingExpenseAmount = submittedExpenseAmount - totalExpenseAmount
 
   const memberCards = [
     {
@@ -34,18 +32,11 @@ export function StatsCards({ stats, mode = "member" }: StatsCardsProps) {
       bgColor: "bg-blue-50",
     },
     {
-      title: "Submitted Expense",
-      value: formatCurrency(submittedExpenseAmount),
+      title: "Budget",
+      value: formatCurrency(stats.totalBudget ?? 0),
       icon: DollarSign,
       color: "text-indigo-600",
       bgColor: "bg-indigo-50",
-    },
-    {
-      title: "Remaining",
-      value: formatCurrency(remainingExpenseAmount),
-      icon: DollarSign,
-      color: remainingExpenseAmount >= 0 ? "text-green-600" : "text-red-600",
-      bgColor: remainingExpenseAmount >= 0 ? "bg-green-50" : "bg-red-50",
     },
     {
       title: "Pending",

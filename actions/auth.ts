@@ -45,6 +45,10 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(6, "New password must be at least 6 characters"),
 })
 
+const adminChangePasswordSchema = z.object({
+  newPassword: z.string().min(6, "Password must be at least 6 characters"),
+})
+
 const adminResetMemberPasswordSchema = z.object({
   email: z.string().email("Invalid email address"),
   newPassword: z.string().min(6, "New password must be at least 6 characters"),
@@ -177,6 +181,33 @@ export async function changeMyPassword(data: z.infer<typeof changePasswordSchema
     return { error: "Current password is incorrect" }
   }
 
+  const hashedPassword = await hashPassword(newPassword)
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: { password: hashedPassword },
+  })
+
+  revalidatePath("/dashboard")
+  revalidatePath("/admin")
+
+  return { success: true }
+}
+
+export async function adminChangePassword(data: z.infer<typeof adminChangePasswordSchema>) {
+  const session = await auth()
+
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return { error: "Only admins can use this feature" }
+  }
+
+  const result = adminChangePasswordSchema.safeParse(data)
+
+  if (!result.success) {
+    return { error: result.error.issues[0].message }
+  }
+
+  const { newPassword } = result.data
   const hashedPassword = await hashPassword(newPassword)
 
   await prisma.user.update({

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, LogOut, Users, Receipt, Menu, X, KeyRound } from "lucide-react"
+import { LayoutDashboard, LogOut, Users, Receipt, Menu, X } from "lucide-react"
 
 interface NavProps {
   user: {
@@ -39,12 +39,6 @@ export function Navigation({ user }: NavProps) {
       label: "Members",
       icon: Users,
       visible: isAdmin,
-    },
-    {
-      href: "/change-password",
-      label: "Change Password",
-      icon: KeyRound,
-      visible: true,
     },
   ]
 

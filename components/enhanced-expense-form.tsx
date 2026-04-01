@@ -16,7 +16,7 @@ import { PencilIcon, CheckIcon, XIcon } from "lucide-react"
 
 interface EnhancedExpenseFormProps {
   memberName: string
-  submittedExpenseAmount: number
+  budget: number
   totalAmountUsed: number
   onSuccess?: () => void
 }
@@ -29,7 +29,7 @@ const CATEGORIES = [
 
 export function EnhancedExpenseForm({ 
   memberName,
-  submittedExpenseAmount,
+  budget,
   totalAmountUsed,
   onSuccess 
 }: EnhancedExpenseFormProps) {
@@ -38,52 +38,43 @@ export function EnhancedExpenseForm({
   const [error, setError] = useState("")
   const [expenseAmount, setExpenseAmount] = useState(0)
   const [liveTotalAmountUsed, setLiveTotalAmountUsed] = useState(totalAmountUsed)
-  const [liveSubmittedAmount, setLiveSubmittedAmount] = useState(submittedExpenseAmount)
-  const [editingSubmitted, setEditingSubmitted] = useState(false)
-  const [submittedEditValue, setSubmittedEditValue] = useState(submittedExpenseAmount.toString())
-  const [submittedLoading, setSubmittedLoading] = useState(false)
-  const [submittedError, setSubmittedError] = useState("")
+  const [liveBudget, setLiveBudget] = useState(budget)
+  const [editingBudget, setEditingBudget] = useState(false)
+  const [budgetEditValue, setBudgetEditValue] = useState(budget.toString())
+  const [budgetLoading, setBudgetLoading] = useState(false)
+  const [budgetError, setBudgetError] = useState("")
 
   useEffect(() => {
     setLiveTotalAmountUsed(totalAmountUsed)
-    setLiveSubmittedAmount(submittedExpenseAmount)
-    setSubmittedEditValue(submittedExpenseAmount.toString())
-  }, [submittedExpenseAmount, totalAmountUsed])
+    setLiveBudget(budget)
+    setBudgetEditValue(budget.toString())
+  }, [budget, totalAmountUsed])
 
-  const editValue = Number.parseFloat(submittedEditValue)
-  const previewSubmittedAmount = editingSubmitted && !Number.isNaN(editValue)
-    ? editValue
-    : liveSubmittedAmount
+  async function handleBudgetUpdate() {
+    setBudgetLoading(true)
+    setBudgetError("")
+    const newBudget = parseFloat(budgetEditValue)
 
-  const remainingExpense = previewSubmittedAmount - liveTotalAmountUsed
-
-  async function handleSubmittedExpenseUpdate() {
-    setSubmittedLoading(true)
-    setSubmittedError("")
-    const newSubmitted = parseFloat(submittedEditValue)
-
-    if (isNaN(newSubmitted) || newSubmitted < 0) {
-      setSubmittedError("Amount must be 0 or greater")
-      setSubmittedLoading(false)
+    if (isNaN(newBudget) || newBudget < 0) {
+      setBudgetError("Amount must be 0 or greater")
+      setBudgetLoading(false)
       return
     }
 
-    const result = await updateUserBudget(newSubmitted)
+    const result = await updateUserBudget(newBudget)
     if (result?.error) {
-      setSubmittedError(result.error)
-      setSubmittedLoading(false)
+      setBudgetError(result.error)
+      setBudgetLoading(false)
       return
     }
 
-    setLiveSubmittedAmount(newSubmitted)
-    setSubmittedEditValue(newSubmitted.toString())
-    setEditingSubmitted(false)
+    setLiveBudget(newBudget)
+    setBudgetEditValue(newBudget.toString())
+    setEditingBudget(false)
     void broadcastExpenseChange("member-budget-update")
     router.refresh()
-    setSubmittedLoading(false)
+    setBudgetLoading(false)
   }
-  const totalAfterExpense = liveTotalAmountUsed + expenseAmount
-  const remainingAfterExpense = previewSubmittedAmount - totalAfterExpense
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -122,23 +113,23 @@ export function EnhancedExpenseForm({
       <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-blue-900">Budget Overview</CardTitle>
-          {!editingSubmitted && (
+          {!editingBudget && (
             <button
               onClick={() => {
-                setSubmittedEditValue(liveSubmittedAmount.toString())
-                setEditingSubmitted(true)
+                setBudgetEditValue(liveBudget.toString())
+                setEditingBudget(true)
               }}
               className="p-2 text-blue-600 hover:bg-blue-200 rounded-lg transition"
-              title="Edit submitted expense"
+              title="Edit budget"
             >
               <PencilIcon className="w-4 h-4" />
             </button>
           )}
         </CardHeader>
         <CardContent className="space-y-4">
-          {submittedError && (
+          {budgetError && (
             <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">
-              {submittedError}
+              {budgetError}
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -146,23 +137,23 @@ export function EnhancedExpenseForm({
               <p className="text-sm text-blue-700 mb-1">Member Name</p>
               <p className="text-lg font-semibold text-blue-900">{memberName}</p>
             </div>
-            {/* Editable Submitted Expense */}
+            {/* Editable Budget */}
             <div>
-              {editingSubmitted ? (
+              {editingBudget ? (
                 <div className="space-y-2">
-                  <p className="text-sm text-blue-700">Submitted Expense</p>
+                  <p className="text-sm text-blue-700">Budget</p>
                   <div className="flex gap-2">
                     <Input
                       type="number"
-                      value={submittedEditValue}
-                      onChange={(e) => setSubmittedEditValue(e.target.value)}
+                      value={budgetEditValue}
+                      onChange={(e) => setBudgetEditValue(e.target.value)}
                       step="0.01"
                       min="0"
                       className="p-1 h-8 text-sm"
                     />
                     <button
-                      onClick={handleSubmittedExpenseUpdate}
-                      disabled={submittedLoading}
+                      onClick={handleBudgetUpdate}
+                      disabled={budgetLoading}
                       className="p-1 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400"
                       title="Save"
                     >
@@ -170,40 +161,29 @@ export function EnhancedExpenseForm({
                     </button>
                     <button
                       onClick={() => {
-                        setEditingSubmitted(false)
-                        setSubmittedEditValue(liveSubmittedAmount.toString())
-                        setSubmittedError("")
+                        setEditingBudget(false)
+                        setBudgetEditValue(liveBudget.toString())
+                        setBudgetError("")
                       }}
-                      disabled={submittedLoading}
+                      disabled={budgetLoading}
                       className="p-1 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-400"
                       title="Cancel"
                     >
                       <XIcon className="w-4 h-4" />
                     </button>
                   </div>
-                  {submittedEditValue && !Number.isNaN(editValue) && (
-                    <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded">
-                      New Remaining: {formatCurrency(editValue - liveTotalAmountUsed)}
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div>
-                  <p className="text-sm text-blue-700 mb-1">Submitted Expense</p>
-                  <p className="text-lg font-semibold text-blue-900">{formatCurrency(liveSubmittedAmount)}</p>
+                  <p className="text-sm text-blue-700 mb-1">Budget</p>
+                  <p className="text-lg font-semibold text-blue-900">{formatCurrency(liveBudget)}</p>
                 </div>
               )}
             </div>
 
             <div>
-              <p className="text-sm text-blue-700 mb-1">Total Expense (before)</p>
+              <p className="text-sm text-blue-700 mb-1">Total Expense</p>
               <p className="text-lg font-semibold text-blue-900">{formatCurrency(liveTotalAmountUsed)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-blue-700 mb-1">Remaining</p>
-              <p className={`text-lg font-semibold ${remainingExpense >= 0 ? "text-green-700" : "text-red-700"}`}>
-                {formatCurrency(remainingExpense)}
-              </p>
             </div>
           </div>
         </CardContent>
@@ -287,12 +267,8 @@ export function EnhancedExpenseForm({
                   <span className="font-semibold text-orange-600">{formatCurrency(expenseAmount)}</span>
                 </div>
                 <div className="flex justify-between border-t pt-2">
-                  <span className="text-gray-600">= Total Expense (after):</span>
-                  <span className="font-semibold">{formatCurrency(totalAfterExpense)}</span>
-                </div>
-                <div className={`flex justify-between border-t pt-2 ${remainingAfterExpense < 0 ? "text-red-600" : "text-green-600"}`}>
-                  <span className="font-semibold">Remaining (after):</span>
-                  <span className="font-bold text-lg">{formatCurrency(remainingAfterExpense)}</span>
+                  <span className="text-gray-600">= Total (after):</span>
+                  <span className="font-semibold">{formatCurrency(liveTotalAmountUsed + expenseAmount)}</span>
                 </div>
               </div>
             </CardContent>

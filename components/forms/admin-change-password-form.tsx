@@ -1,31 +1,21 @@
 "use client"
 
 import { useState } from "react"
-import { adminResetMemberPassword } from "@/actions/auth"
+import { useRouter } from "next/navigation"
+import { adminChangePassword } from "@/actions/auth"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Select } from "@/components/ui/select"
 import { Eye, EyeOff } from "lucide-react"
 
-type Member = {
-  id: string
-  name: string | null
-  email: string
-}
-
-interface ResetMemberPasswordFormProps {
-  members: Member[]
-}
-
-export function ResetMemberPasswordForm({ members }: ResetMemberPasswordFormProps) {
+export function AdminChangePasswordForm() {
+  const router = useRouter()
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [loading, setLoading] = useState(false)
-  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [selectedEmail, setSelectedEmail] = useState("")
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -35,23 +25,16 @@ export function ResetMemberPasswordForm({ members }: ResetMemberPasswordFormProp
 
     const form = e.currentTarget
     const formData = new FormData(form)
-    const email = selectedEmail || (formData.get("email") as string)
     const newPassword = formData.get("newPassword") as string
     const confirmPassword = formData.get("confirmPassword") as string
 
-    if (!email) {
-      setError("Please select a member or enter an email")
-      setLoading(false)
-      return
-    }
-
     if (newPassword !== confirmPassword) {
-      setError("New password and confirm password must match")
+      setError("Passwords do not match")
       setLoading(false)
       return
     }
 
-    const result = await adminResetMemberPassword({ email, newPassword })
+    const result = await adminChangePassword({ newPassword })
 
     if (result?.error) {
       setError(result.error)
@@ -60,16 +43,16 @@ export function ResetMemberPasswordForm({ members }: ResetMemberPasswordFormProp
     }
 
     form.reset()
-    setSelectedEmail("")
-    setSuccess("Member password reset successfully")
+    setSuccess("Password changed successfully")
     setLoading(false)
+    router.refresh()
   }
 
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold">Reset Member Password</CardTitle>
-        <CardDescription>Admin only: reset a member account password</CardDescription>
+        <CardTitle className="text-2xl font-bold">Change Password</CardTitle>
+        <CardDescription>Update your admin account password</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit}>
         <CardContent className="space-y-4">
@@ -77,50 +60,12 @@ export function ResetMemberPasswordForm({ members }: ResetMemberPasswordFormProp
           {success && <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700">{success}</div>}
 
           <div className="space-y-2">
-            <Label htmlFor="memberSelect">Select Member</Label>
-            <Select
-              id="memberSelect"
-              value={selectedEmail}
-              onChange={(e) => setSelectedEmail(e.target.value)}
-            >
-              <option value="">-- Select a member --</option>
-              {members.map((member) => (
-                <option key={member.id} value={member.email}>
-                  {member.name || member.email} ({member.email})
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div className="relative flex items-center justify-center">
-            <span className="bg-white px-2 text-sm text-gray-500 z-10">or</span>
-            <div className="absolute inset-x-0 top-1/2 h-px bg-gray-200" />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Enter Email Manually</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="member@example.com"
-              value={selectedEmail ? "" : ""}
-              onChange={(e) => {
-                if (!selectedEmail) {
-                  // Only allow manual entry if dropdown is empty
-                }
-              }}
-              disabled={!!selectedEmail}
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="newPassword">New Password</Label>
             <div className="relative">
               <Input
                 id="newPassword"
                 name="newPassword"
-                type={showNewPassword ? "text" : "password"}
+                type={showPassword ? "text" : "password"}
                 className="pr-10"
                 required
                 minLength={6}
@@ -128,17 +73,17 @@ export function ResetMemberPasswordForm({ members }: ResetMemberPasswordFormProp
               />
               <button
                 type="button"
-                onClick={() => setShowNewPassword((prev) => !prev)}
+                onClick={() => setShowPassword((prev) => !prev)}
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                aria-label={showNewPassword ? "Hide new password" : "Show new password"}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm New Password</Label>
+            <Label htmlFor="confirmPassword">Confirm Password</Label>
             <div className="relative">
               <Input
                 id="confirmPassword"
@@ -162,7 +107,7 @@ export function ResetMemberPasswordForm({ members }: ResetMemberPasswordFormProp
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Resetting..." : "Reset Password"}
+            {loading ? "Updating..." : "Update Password"}
           </Button>
         </CardFooter>
       </form>

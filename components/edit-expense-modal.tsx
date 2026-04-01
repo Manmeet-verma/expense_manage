@@ -23,7 +23,7 @@ interface Expense {
 
 interface EditExpenseModalProps {
   expense: Expense
-  submittedExpenseAmount: number
+  budget: number
   totalAmountUsed: number
   isOpen: boolean
   onClose: () => void
@@ -41,7 +41,7 @@ const CATEGORIES = [
   { value: "OTHER", label: "Other" },
 ]
 
-export function EditExpenseModal({ expense, submittedExpenseAmount, totalAmountUsed, isOpen, onClose, onSuccess }: EditExpenseModalProps) {
+export function EditExpenseModal({ expense, budget, totalAmountUsed, isOpen, onClose, onSuccess }: EditExpenseModalProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -56,7 +56,7 @@ export function EditExpenseModal({ expense, submittedExpenseAmount, totalAmountU
 
   const editedAmount = parseFloat(formData.amount) || 0
   const adjustedTotalExpense = totalAmountUsed - expense.amount + editedAmount
-  const adjustedRemaining = submittedExpenseAmount - adjustedTotalExpense
+  const adjustedRemaining = budget - adjustedTotalExpense
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -160,8 +160,8 @@ export function EditExpenseModal({ expense, submittedExpenseAmount, totalAmountU
                 <CardContent className="pt-4">
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Submitted Expense:</span>
-                      <span className="font-semibold">{formatCurrency(submittedExpenseAmount)}</span>
+                      <span className="text-gray-600">Budget:</span>
+                      <span className="font-semibold">{formatCurrency(budget)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Total Expense (after edit):</span>

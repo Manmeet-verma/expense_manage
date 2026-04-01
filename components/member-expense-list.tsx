@@ -27,11 +27,11 @@ interface Expense {
 
 interface MemberExpenseListProps {
   expenses: Expense[]
-  submittedExpenseAmount: number
+  budget: number
   totalAmountUsed: number
 }
 
-export function MemberExpenseList({ expenses, submittedExpenseAmount, totalAmountUsed }: MemberExpenseListProps) {
+export function MemberExpenseList({ expenses, budget, totalAmountUsed }: MemberExpenseListProps) {
   const router = useRouter()
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null)
@@ -62,7 +62,7 @@ export function MemberExpenseList({ expenses, submittedExpenseAmount, totalAmoun
       {editingExpense && (
         <EditExpenseModal
           expense={editingExpense}
-          submittedExpenseAmount={submittedExpenseAmount}
+          budget={budget}
           totalAmountUsed={totalAmountUsed}
           isOpen={Boolean(editingExpense)}
           onClose={() => setEditingExpense(null)}
