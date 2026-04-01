@@ -1,5 +1,21 @@
 {
   "buildCommand": "npm run build",
   "installCommand": "npm install --audit=false --fund=false",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "headers": [
+    {
+      "source": "/:path*",
+      "headers": [
+        {
+          "key": "Upgrade",
+          "value": "websocket"
+        },
+        {
+          "key": "Connection",
+          "value": "upgrade"
+        }
+      ]
+    }
+  ]
 }
