@@ -15,6 +15,7 @@ export function LoginForm() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [email, setEmail] = useState("")
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -61,6 +62,9 @@ export function LoginForm() {
               type="email"
               placeholder="you@example.com"
               required
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -73,6 +77,7 @@ export function LoginForm() {
                 placeholder="••••••••"
                 className="pr-10"
                 required
+                autoComplete="current-password"
               />
               <button
                 type="button"
@@ -85,17 +90,19 @@ export function LoginForm() {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-4">
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in..." : "Sign In"}
-          </Button>
-          <div className="flex flex-col items-center gap-2 text-sm text-center">
-            <Link href="/forgot-password" className="text-blue-600 hover:underline">
-              Forgot Password? (Admin Only)
-            </Link>
-            <p className="text-gray-600">Contact your admin to create a member account.</p>
-          </div>
-        </CardFooter>
+          <CardFooter className="flex flex-col space-y-4">
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
+            </Button>
+            <div className="flex flex-col items-center gap-2 text-sm text-center">
+              {email && (
+                <Link href="/forgot-password" className="text-blue-600 hover:underline">
+                  Forgot Password?
+                </Link>
+              )}
+              <p className="text-gray-600">Contact your admin to create a member account.</p>
+            </div>
+          </CardFooter>
       </form>
     </Card>
   )
