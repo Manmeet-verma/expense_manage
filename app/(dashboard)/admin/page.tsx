@@ -91,6 +91,12 @@ export default async function AdminPage() {
       <div className="mt-8 flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-gray-900">Member Accounts</h2>
         <div className="flex items-center gap-2">
+          <Link href="/admin/verify-members" className={buttonVariants({ variant: "outline" })}>
+            <span className="inline-flex items-center gap-2">
+              <KeyRound className="h-4 w-4" />
+              Verify Passwords
+            </span>
+          </Link>
           <Link href="/admin/reset-password" className={buttonVariants({ variant: "outline" })}>
             <span className="inline-flex items-center gap-2">
               <KeyRound className="h-4 w-4" />

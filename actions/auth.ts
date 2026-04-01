@@ -66,7 +66,9 @@ const adminForgotPasswordSchema = z.object({
   email: z.string().email("Invalid email address"),
   newPassword: z.string().min(6, "New password must be at least 6 characters"),
 })
-
+const verifyMemberPasswordSchema = z.object({
+  memberId: z.string().min(1, "Member ID is required"),
+})
 export async function signup(data: z.infer<typeof signupSchema>) {
   const session = await auth()
 
@@ -239,7 +241,7 @@ export async function adminResetMemberPassword(data: z.infer<typeof adminResetMe
 
   const user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
-    select: { id: true, role: true },
+    select: { id: true, role: true, password: true },
   })
 
   if (!user) {
@@ -260,6 +262,47 @@ export async function adminResetMemberPassword(data: z.infer<typeof adminResetMe
   revalidatePath("/admin")
 
   return { success: true }
+}
+
+export async function verifyMemberPassword(
+  data: z.infer<typeof verifyMemberPasswordSchema>
+) {
+  const session = await auth()
+
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return { error: "Only admins can verify member passwords" }
+  }
+
+  const result = verifyMemberPasswordSchema.safeParse(data)
+
+  if (!result.success) {
+    return { error: result.error.issues[0].message }
+  }
+
+  const { memberId } = result.data
+
+  const user = await prisma.user.findUnique({
+    where: { id: memberId },
+    select: { id: true, email: true, role: true, password: true },
+  })
+
+  if (!user) {
+    return { error: "Member not found" }
+  }
+
+  if (user.role !== "MEMBER") {
+    return { error: "This is not a member account" }
+  }
+
+  return {
+    success: true,
+    hasPassword: !!user.password,
+    passwordType: user.password ? "hashed" : "none",
+    email: user.email,
+    message: user.password
+      ? "✓ Member has a valid password"
+      : "✗ Member has no password - ask admin to reset it",
+  }
 }
 
 export async function getMembers() {
