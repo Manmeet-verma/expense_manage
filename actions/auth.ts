@@ -27,6 +27,11 @@ const deleteMemberSchema = z.object({
   memberId: z.string().min(1, "Member ID is required"),
 })
 
+const adminForgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  newPassword: z.string().min(6, "New password must be at least 6 characters"),
+})
+
 export async function signup(data: z.infer<typeof signupSchema>) {
   const session = await auth()
 
@@ -217,6 +222,47 @@ export async function deleteMember(data: z.infer<typeof deleteMemberSchema>) {
 
   revalidatePath("/admin")
   revalidatePath("/admin/members")
+
+  return { success: true }
+}
+
+export async function adminForgotPassword(data: z.infer<typeof adminForgotPasswordSchema>) {
+  const session = await auth()
+
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return { error: "Only admins can reset their password" }
+  }
+
+  const result = adminForgotPasswordSchema.safeParse(data)
+
+  if (!result.success) {
+    return { error: result.error.issues[0].message }
+  }
+
+  const { email, newPassword } = result.data
+  const normalizedEmail = email.trim().toLowerCase()
+
+  if (normalizedEmail !== session.user.email) {
+    return { error: "You can only reset your own password" }
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: { id: true, role: true },
+  })
+
+  if (!user || user.role !== "ADMIN") {
+    return { error: "Admin account not found" }
+  }
+
+  const hashedPassword = await hashPassword(newPassword)
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { password: hashedPassword },
+  })
+
+  revalidatePath("/dashboard")
 
   return { success: true }
 }

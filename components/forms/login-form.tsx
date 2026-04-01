@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -88,7 +89,12 @@ export function LoginForm() {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign In"}
           </Button>
-          <p className="text-sm text-center text-gray-600">Contact your admin to create a member account.</p>
+          <div className="flex flex-col items-center gap-2 text-sm text-center">
+            <Link href="/forgot-password" className="text-blue-600 hover:underline">
+              Forgot Password? (Admin Only)
+            </Link>
+            <p className="text-gray-600">Contact your admin to create a member account.</p>
+          </div>
         </CardFooter>
       </form>
     </Card>
