@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff } from "lucide-react"
+import { checkIsAdminEmail } from "@/actions/auth"
 
 export function LoginForm() {
   const router = useRouter()
@@ -16,6 +17,24 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
+  const [isAdminEmail, setIsAdminEmail] = useState(false)
+  const [checkingAdmin, setCheckingAdmin] = useState(false)
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (email && email.includes("@")) {
+        setCheckingAdmin(true)
+        const result = await checkIsAdminEmail(email)
+        setIsAdminEmail(result.isAdmin)
+        setCheckingAdmin(false)
+      } else {
+        setIsAdminEmail(false)
+      }
+    }
+    
+    const timeoutId = setTimeout(checkAdmin, 500)
+    return () => clearTimeout(timeoutId)
+  }, [email])
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -95,7 +114,7 @@ export function LoginForm() {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
             <div className="flex flex-col items-center gap-2 text-sm text-center">
-              {email && (
+              {email && !checkingAdmin && isAdminEmail && (
                 <Link href="/forgot-password" className="text-blue-600 hover:underline">
                   Forgot Password?
                 </Link>

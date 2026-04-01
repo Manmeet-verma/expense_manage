@@ -7,6 +7,27 @@ import { auth } from "@/lib/auth"
 import { hashPassword } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 
+const checkAdminEmailSchema = z.object({
+  email: z.string().email("Invalid email address"),
+})
+
+export async function checkIsAdminEmail(email: string) {
+  const result = checkAdminEmailSchema.safeParse({ email })
+
+  if (!result.success) {
+    return { isAdmin: false }
+  }
+
+  const normalizedEmail = email.trim().toLowerCase()
+
+  const user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: { role: true },
+  })
+
+  return { isAdmin: user?.role === "ADMIN" }
+}
+
 const signupSchema = z.object({
   email: z.string().email("Invalid email address"),
   name: z.string().min(2, "Name must be at least 2 characters"),
