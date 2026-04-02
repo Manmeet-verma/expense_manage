@@ -21,6 +21,12 @@ interface MyStatementClientProps {
   userId: string
 }
 
+function formatCategory(category: string): string {
+  if (category === "OFFICE_GOODS") return "Office Goods"
+  if (category === "FREIGHT") return "Freight/Gaddi"
+  return category.charAt(0) + category.slice(1).toLowerCase().replace(/_/g, " ")
+}
+
 export function MyStatementClient({ userId }: MyStatementClientProps) {
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
@@ -177,7 +183,7 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
                         return (
                           <tr key={expense.id} className="hover:bg-gray-50">
                             <td className="px-3 py-2 text-gray-700">{formatDate(expense.createdAt)}</td>
-                            <td className="px-3 py-2 text-gray-700">{expense.category}</td>
+                            <td className="px-3 py-2 text-gray-700">{formatCategory(expense.category)}</td>
                             <td className="px-3 py-2 font-semibold text-gray-900 text-right">{formatCurrency(expense.amount)}</td>
                             <td className="px-3 py-2 text-gray-600 text-right">{formatCurrency(dayTotal)}</td>
                             <td className="px-3 py-2">
