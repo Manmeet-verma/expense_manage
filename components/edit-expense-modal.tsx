@@ -31,13 +31,13 @@ interface EditExpenseModalProps {
 }
 
 const CATEGORIES = [
-  { value: "FOOD", label: "Food & Dining" },
-  { value: "TRAVEL", label: "Travel" },
-  { value: "TRANSPORTATION", label: "Transportation" },
-  { value: "ACCOMMODATION", label: "Accommodation" },
-  { value: "OFFICE_SUPPLIES", label: "Office Supplies" },
-  { value: "COMMUNICATION", label: "Communication" },
-  { value: "ENTERTAINMENT", label: "Entertainment" },
+  { value: "FREIGHT", label: "Freight/Gaddi" },
+  { value: "PORTER", label: "Porter" },
+  { value: "FOOD", label: "Food" },
+  { value: "OFFICE_GOODS", label: "Office Goods" },
+  { value: "HOTEL", label: "Hotel" },
+  { value: "PETROL", label: "Petrol" },
+  { value: "DIESEL", label: "Diesel" },
   { value: "OTHER", label: "Other" },
 ]
 
@@ -67,7 +67,7 @@ export function EditExpenseModal({ expense, budget, totalAmountUsed, isOpen, onC
       title: formData.title,
       description: formData.description || undefined,
       amount: parseFloat(formData.amount),
-      category: formData.category as "FOOD" | "TRAVEL" | "TRANSPORTATION" | "ACCOMMODATION" | "OFFICE_SUPPLIES" | "COMMUNICATION" | "ENTERTAINMENT" | "OTHER",
+      category: formData.category as "FREIGHT" | "PORTER" | "FOOD" | "OFFICE_GOODS" | "HOTEL" | "PETROL" | "DIESEL" | "OTHER",
     })
 
     if (result?.error) {

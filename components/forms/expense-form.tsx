@@ -22,13 +22,13 @@ interface ExpenseFormProps {
 }
 
 const categories = [
-  { value: "FOOD", label: "Food & Dining" },
-  { value: "TRAVEL", label: "Travel" },
-  { value: "TRANSPORTATION", label: "Transportation" },
-  { value: "ACCOMMODATION", label: "Accommodation" },
-  { value: "OFFICE_SUPPLIES", label: "Office Supplies" },
-  { value: "COMMUNICATION", label: "Communication" },
-  { value: "ENTERTAINMENT", label: "Entertainment" },
+  { value: "FREIGHT", label: "Freight/Gaddi" },
+  { value: "PORTER", label: "Porter" },
+  { value: "FOOD", label: "Food" },
+  { value: "OFFICE_GOODS", label: "Office Goods" },
+  { value: "HOTEL", label: "Hotel" },
+  { value: "PETROL", label: "Petrol" },
+  { value: "DIESEL", label: "Diesel" },
   { value: "OTHER", label: "Other" },
 ] as const
 

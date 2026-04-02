@@ -6,10 +6,10 @@ import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 
 const expenseSchema = z.object({
-  title: z.string().min(1, "Title is required"),
+  title: z.string().optional(),
   description: z.string().optional(),
   amount: z.number().positive("Amount must be positive"),
-  category: z.enum(["FOOD", "TRAVEL", "TRANSPORTATION", "ACCOMMODATION", "OFFICE_SUPPLIES", "COMMUNICATION", "ENTERTAINMENT", "OTHER"]),
+  category: z.enum(["FREIGHT", "PORTER", "FOOD", "OFFICE_GOODS", "HOTEL", "PETROL", "DIESEL", "OTHER"]),
 })
 
 const approvalSchema = z.object({
@@ -41,9 +41,20 @@ export async function createExpense(data: z.infer<typeof expenseSchema>) {
 
   const { title, description, amount, category } = result.data
 
+  const categoryLabels: Record<string, string> = {
+    FREIGHT: "Freight/Gaddi",
+    PORTER: "Porter",
+    FOOD: "Food",
+    OFFICE_GOODS: "Office Goods",
+    HOTEL: "Hotel",
+    PETROL: "Petrol",
+    DIESEL: "Diesel",
+    OTHER: "Other",
+  }
+
   await prisma.expense.create({
     data: {
-      title,
+      title: title || categoryLabels[category] || "Expense",
       description,
       amount,
       category,

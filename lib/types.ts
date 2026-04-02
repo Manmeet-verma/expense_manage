@@ -6,13 +6,13 @@ export const Role = {
 export type Role = (typeof Role)[keyof typeof Role]
 
 export const ExpenseCategory = {
+  FREIGHT: "FREIGHT",
+  PORTER: "PORTER",
   FOOD: "FOOD",
-  TRAVEL: "TRAVEL",
-  TRANSPORTATION: "TRANSPORTATION",
-  ACCOMMODATION: "ACCOMMODATION",
-  OFFICE_SUPPLIES: "OFFICE_SUPPLIES",
-  COMMUNICATION: "COMMUNICATION",
-  ENTERTAINMENT: "ENTERTAINMENT",
+  OFFICE_GOODS: "OFFICE_GOODS",
+  HOTEL: "HOTEL",
+  PETROL: "PETROL",
+  DIESEL: "DIESEL",
   OTHER: "OTHER",
 } as const
 

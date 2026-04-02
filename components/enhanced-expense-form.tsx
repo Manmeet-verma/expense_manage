@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createExpense } from "@/actions/expense"
-import { updateUserBudget } from "@/actions/expense"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,7 +11,7 @@ import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { formatCurrency } from "@/lib/utils"
 import { broadcastExpenseChange } from "@/lib/supabase/realtime"
-import { PencilIcon, CheckIcon, XIcon } from "lucide-react"
+
 
 interface EnhancedExpenseFormProps {
   memberName: string
@@ -22,9 +21,18 @@ interface EnhancedExpenseFormProps {
 }
 
 const CATEGORIES = [
-  { value: "TRAVEL", label: "Travel" },
-  { value: "FOOD", label: "Food & Dining" },
-  { value: "OFFICE_SUPPLIES", label: "Office" },
+  { value: "FREIGHT", label: "Freight/Gaddi" },
+  { value: "PORTER", label: "Porter" },
+  { value: "FOOD", label: "Food" },
+  { value: "OFFICE_GOODS", label: "Office Goods" },
+  { value: "HOTEL", label: "Hotel" },
+  { value: "PETROL", label: "Petrol" },
+  { value: "DIESEL", label: "Diesel" },
+] as const
+
+const OFFICE_GOODS_SUB = [
+  { value: "IRON", label: "Iron" },
+  { value: "WELDING", label: "Welding" },
   { value: "OTHER", label: "Other" },
 ] as const
 
@@ -39,43 +47,11 @@ export function EnhancedExpenseForm({
   const [error, setError] = useState("")
   const [expenseAmount, setExpenseAmount] = useState(0)
   const [liveTotalAmountUsed, setLiveTotalAmountUsed] = useState(totalAmountUsed)
-  const [liveBudget, setLiveBudget] = useState(budget)
-  const [editingBudget, setEditingBudget] = useState(false)
-  const [budgetEditValue, setBudgetEditValue] = useState(budget.toString())
-  const [budgetLoading, setBudgetLoading] = useState(false)
-  const [budgetError, setBudgetError] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<string>("FREIGHT")
 
   useEffect(() => {
     setLiveTotalAmountUsed(totalAmountUsed)
-    setLiveBudget(budget)
-    setBudgetEditValue(budget.toString())
-  }, [budget, totalAmountUsed])
-
-  async function handleBudgetUpdate() {
-    setBudgetLoading(true)
-    setBudgetError("")
-    const newBudget = parseFloat(budgetEditValue)
-
-    if (isNaN(newBudget) || newBudget < 0) {
-      setBudgetError("Amount must be 0 or greater")
-      setBudgetLoading(false)
-      return
-    }
-
-    const result = await updateUserBudget(newBudget)
-    if (result?.error) {
-      setBudgetError(result.error)
-      setBudgetLoading(false)
-      return
-    }
-
-    setLiveBudget(newBudget)
-    setBudgetEditValue(newBudget.toString())
-    setEditingBudget(false)
-    void broadcastExpenseChange("member-budget-update")
-    router.refresh()
-    setBudgetLoading(false)
-  }
+  }, [totalAmountUsed])
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -88,7 +64,7 @@ export function EnhancedExpenseForm({
       title: formData.get("title") as string,
       description: formData.get("description") as string || undefined,
       amount: parseFloat(formData.get("amount") as string),
-      category: formData.get("category") as "TRAVEL" | "FOOD" | "OFFICE_SUPPLIES" | "OTHER",
+      category: formData.get("category") as "FREIGHT" | "PORTER" | "FOOD" | "OFFICE_GOODS" | "HOTEL" | "PETROL" | "DIESEL" | "OTHER",
     }
     const createdAmount = data.amount
 
@@ -110,85 +86,6 @@ export function EnhancedExpenseForm({
 
   return (
     <div className="space-y-4">
-      {/* Budget Overview Card */}
-      <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
-        <CardHeader className="flex flex-row items-center justify-between py-2">
-          <CardTitle className="text-blue-900 text-sm">Opening Balance</CardTitle>
-          {!editingBudget && (
-            <button
-              onClick={() => {
-                setBudgetEditValue(liveBudget.toString())
-                setEditingBudget(true)
-              }}
-              className="p-1 text-blue-600 hover:bg-blue-200 rounded transition"
-              title="Edit budget"
-            >
-              <PencilIcon className="w-3 h-3" />
-            </button>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-2 py-2">
-          {budgetError && (
-            <div className="bg-red-50 text-red-600 text-xs p-2 rounded">
-              {budgetError}
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <p className="text-xs text-blue-700">Member</p>
-              <p className="text-sm font-semibold text-blue-900">{memberName}</p>
-            </div>
-            <div>
-              {editingBudget ? (
-                <div className="space-y-1">
-                  <p className="text-xs text-blue-700">Budget</p>
-                  <div className="flex gap-1">
-                    <Input
-                      type="number"
-                      value={budgetEditValue}
-                      onChange={(e) => setBudgetEditValue(e.target.value)}
-                      step="0.01"
-                      min="0"
-                      className="p-1 h-6 text-xs"
-                    />
-                    <button
-                      onClick={handleBudgetUpdate}
-                      disabled={budgetLoading}
-                      className="p-1 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400"
-                      title="Save"
-                    >
-                      <CheckIcon className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingBudget(false)
-                        setBudgetEditValue(liveBudget.toString())
-                        setBudgetError("")
-                      }}
-                      disabled={budgetLoading}
-                      className="p-1 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-400"
-                      title="Cancel"
-                    >
-                      <XIcon className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-xs text-blue-700">Budget</p>
-                  <p className="text-sm font-semibold text-blue-900">{formatCurrency(liveBudget)}</p>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <p className="text-xs text-blue-700">Total Expense</p>
-              <p className="text-sm font-semibold text-blue-900">{formatCurrency(liveTotalAmountUsed)}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Expense Form Card */}
       <Card>
         <CardHeader className="py-2">
@@ -202,24 +99,13 @@ export function EnhancedExpenseForm({
               </div>
             )}
 
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label htmlFor="title" className="text-xs">Title *</Label>
-              <Input
-                id="title"
-                name="title"
-                placeholder="Title"
-                required
-                className="h-7 text-xs"
-              />
-            </div>
-
-            <div className="space-y-1">
+          <div className="space-y-1">
               <Label htmlFor="category" className="text-xs">Category *</Label>
               <Select 
                 id="category" 
                 name="category" 
-                defaultValue="TRAVEL"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
                 required
                 className="h-7 text-xs"
               >
@@ -230,7 +116,25 @@ export function EnhancedExpenseForm({
                 ))}
               </Select>
             </div>
-          </div>
+
+            {selectedCategory === "OFFICE_GOODS" && (
+              <div className="space-y-1">
+                <Label htmlFor="subCategory" className="text-xs">Sub Category *</Label>
+                <Select 
+                  id="subCategory" 
+                  name="subCategory" 
+                  defaultValue="IRON"
+                  required
+                  className="h-7 text-xs"
+                >
+                  {OFFICE_GOODS_SUB.map((sub) => (
+                    <option key={sub.value} value={sub.value}>
+                      {sub.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
 
           <div className="space-y-1">
             <Label htmlFor="description" className="text-xs">Description</Label>
