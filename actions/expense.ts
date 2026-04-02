@@ -225,6 +225,7 @@ export async function approveOrRejectExpense(data: z.infer<typeof approvalSchema
   })
 
   revalidatePath("/admin")
+  revalidatePath("/admin/members")
   return { success: true }
 }
 
@@ -263,6 +264,7 @@ export async function markExpensePaid(data: z.infer<typeof paymentSchema>) {
   })
 
   revalidatePath("/admin")
+  revalidatePath("/admin/members")
   return { success: true }
 }
 
@@ -326,6 +328,50 @@ export async function getExpenseStats() {
     submittedAmount: submittedTotal,
     remainingBudget,
   }
+}
+
+export async function getApprovedExpenses() {
+  const session = await auth()
+  
+  if (!session?.user) {
+    return []
+  }
+
+  if (session.user.role !== "MEMBER" && session.user.role !== "ADMIN") {
+    return []
+  }
+
+  const where =
+    session.user.role === "ADMIN"
+      ? { status: "APPROVED" as const }
+      : { createdById: session.user.id, status: "APPROVED" as const }
+
+  return await prisma.expense.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+  })
+}
+
+export async function getRejectedExpenses() {
+  const session = await auth()
+  
+  if (!session?.user) {
+    return []
+  }
+
+  if (session.user.role !== "MEMBER" && session.user.role !== "ADMIN") {
+    return []
+  }
+
+  const where =
+    session.user.role === "ADMIN"
+      ? { status: "REJECTED" as const }
+      : { createdById: session.user.id, status: "REJECTED" as const }
+
+  return await prisma.expense.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+  })
 }
 
 export async function updateUserBudget(newBudget: number) {

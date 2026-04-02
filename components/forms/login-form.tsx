@@ -1,8 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { signIn } from "next-auth/react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,42 +8,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff } from "lucide-react"
 
-export function LoginForm() {
-  const router = useRouter()
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+interface LoginFormProps {
+  csrfToken: string
+  initialError?: string
+}
+
+export function LoginForm({ csrfToken, initialError = "" }: LoginFormProps) {
+  const [error] = useState(initialError)
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
-
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setLoading(true)
-    setError("")
-
-    const formData = new FormData(e.currentTarget)
-    const email = (formData.get("email") as string).trim().toLowerCase()
-    const password = formData.get("password") as string
-
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    })
-
-    if (result?.error) {
-      if (result.error.includes("CredentialsSignin")) {
-        setError("Invalid email or password")
-      } else if (result.error.toLowerCase().includes("csrf")) {
-        setError("Session expired. Refresh the page and try again.")
-      } else {
-        setError("Login failed due to a server/auth configuration error.")
-      }
-      setLoading(false)
-    } else {
-      router.push("/dashboard")
-      router.refresh()
-    }
-  }
 
   return (
     <Card className="w-full max-w-md">
@@ -53,7 +24,7 @@ export function LoginForm() {
         <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
         <CardDescription>Enter your credentials to access your account</CardDescription>
       </CardHeader>
-      <form onSubmit={onSubmit}>
+      <form method="post" action="/api/auth/callback/credentials">
         <CardContent className="space-y-4">
           {error && (
             <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">
@@ -95,10 +66,12 @@ export function LoginForm() {
               </button>
             </div>
           </div>
+            <input type="hidden" name="csrfToken" value={csrfToken} />
+            <input type="hidden" name="callbackUrl" value="/dashboard" />
         </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
+            <Button type="submit" className="w-full" disabled={!csrfToken}>
+              Sign In
             </Button>
             <div className="flex flex-col items-center gap-2 text-sm text-center">
               <Link href="/forgot-password" className="text-blue-600 hover:underline">
