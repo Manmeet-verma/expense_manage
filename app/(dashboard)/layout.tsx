@@ -27,10 +27,10 @@ export default async function DashboardLayout({
   return (
     <>
       <Navigation user={session.user} />
-      <div className="flex">
+      <div className="flex relative">
         {!isAdmin && <MemberSidebar />}
         {isAdmin && <AdminSidebar />}
-        <main className="flex-1">
+        <main className="flex-1 min-w-0">
           <LiveDataSync />
           {children}
         </main>
