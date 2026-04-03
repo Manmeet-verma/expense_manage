@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { createFund } from "@/actions/expense"
 import { formatDate } from "@/lib/utils"
+import { Textarea } from "@/components/ui/textarea"
 
 export function MyFundForm() {
   const router = useRouter()
@@ -18,8 +19,7 @@ export function MyFundForm() {
     amount: "",
     receivedFrom: "",
     paymentMode: "CASH" as "CASH" | "GPAY" | "BANK_ACCOUNT",
-    upiId: "",
-    accountNumber: "",
+    receivedFromDescription: "",
   })
 
   async function handleSubmit(e: React.FormEvent) {
@@ -31,10 +31,10 @@ export function MyFundForm() {
 
     const result = await createFund({
       amount: parseFloat(formData.amount),
-      receivedFrom: formData.receivedFrom,
+      receivedFrom: formData.receivedFrom === "OTHER" 
+        ? formData.receivedFromDescription 
+        : formData.receivedFrom,
       paymentMode: formData.paymentMode,
-      upiId: formData.paymentMode === "GPAY" ? formData.upiId : undefined,
-      accountNumber: formData.paymentMode === "BANK_ACCOUNT" ? formData.accountNumber : undefined,
       fundDate,
     })
 
@@ -52,8 +52,7 @@ export function MyFundForm() {
         amount: "",
         receivedFrom: "",
         paymentMode: "CASH",
-        upiId: "",
-        accountNumber: "",
+        receivedFromDescription: "",
       })
       setSuccess(false)
     }, 1500)
@@ -104,15 +103,34 @@ export function MyFundForm() {
 
       <div>
         <Label htmlFor="receivedFrom">Received From *</Label>
-        <Input
+        <Select
           id="receivedFrom"
           value={formData.receivedFrom}
-          onChange={(e) => setFormData({ ...formData, receivedFrom: e.target.value })}
-          placeholder="Enter sender name"
-          required
+          onChange={(e) => setFormData({ ...formData, receivedFrom: e.target.value, receivedFromDescription: "" })}
           className="mt-1"
-        />
+          required
+        >
+          <option value="">Select</option>
+          <option value="Ajay">Ajay</option>
+          <option value="Rishav">Rishav</option>
+          <option value="OTHER">Other</option>
+        </Select>
       </div>
+
+      {formData.receivedFrom === "OTHER" && (
+        <div>
+          <Label htmlFor="receivedFromDescription">Description *</Label>
+          <Textarea
+            id="receivedFromDescription"
+            value={formData.receivedFromDescription}
+            onChange={(e) => setFormData({ ...formData, receivedFromDescription: e.target.value })}
+            placeholder="Enter description"
+            required
+            className="mt-1"
+            rows={2}
+          />
+        </div>
+      )}
 
       <div>
         <Label htmlFor="paymentMode">Payment Mode *</Label>
@@ -127,34 +145,6 @@ export function MyFundForm() {
           <option value="BANK_ACCOUNT">Bank Account</option>
         </Select>
       </div>
-
-      {formData.paymentMode === "GPAY" && (
-        <div>
-          <Label htmlFor="upiId">UPI ID *</Label>
-          <Input
-            id="upiId"
-            value={formData.upiId}
-            onChange={(e) => setFormData({ ...formData, upiId: e.target.value })}
-            placeholder="Enter UPI ID (e.g., mobile@upi)"
-            required
-            className="mt-1"
-          />
-        </div>
-      )}
-
-      {formData.paymentMode === "BANK_ACCOUNT" && (
-        <div>
-          <Label htmlFor="accountNumber">Account Number *</Label>
-          <Input
-            id="accountNumber"
-            value={formData.accountNumber}
-            onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-            placeholder="Enter account number"
-            required
-            className="mt-1"
-          />
-        </div>
-      )}
 
       <div className="flex gap-2 pt-2">
         <Button type="submit" disabled={loading} className="flex-1">

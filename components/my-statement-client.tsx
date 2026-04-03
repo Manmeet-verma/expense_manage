@@ -9,6 +9,7 @@ import { Search, CheckCircle, XCircle, Clock, Plus, Wallet } from "lucide-react"
 import { createFund } from "@/actions/expense"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 
 interface Expense {
   id: string
@@ -35,9 +36,8 @@ function FundDepositModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
   const [formData, setFormData] = useState({
     amount: "",
     receivedFrom: "",
+    receivedFromDescription: "",
     paymentMode: "CASH" as "CASH" | "GPAY" | "BANK_ACCOUNT",
-    upiId: "",
-    accountNumber: "",
     fundDate: new Date().toISOString().split("T")[0],
   })
   const [error, setError] = useState("")
@@ -52,10 +52,10 @@ function FundDepositModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
 
     const result = await createFund({
       amount: parseFloat(formData.amount),
-      receivedFrom: formData.receivedFrom,
+      receivedFrom: formData.receivedFrom === "OTHER" 
+        ? formData.receivedFromDescription 
+        : formData.receivedFrom,
       paymentMode: formData.paymentMode,
-      upiId: formData.paymentMode === "GPAY" ? formData.upiId : undefined,
-      accountNumber: formData.paymentMode === "BANK_ACCOUNT" ? formData.accountNumber : undefined,
       fundDate: formData.fundDate,
     })
 
@@ -73,9 +73,8 @@ function FundDepositModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
       setFormData({
         amount: "",
         receivedFrom: "",
+        receivedFromDescription: "",
         paymentMode: "CASH",
-        upiId: "",
-        accountNumber: "",
         fundDate: new Date().toISOString().split("T")[0],
       })
     }, 1500)
@@ -135,55 +134,48 @@ function FundDepositModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
 
             <div>
               <Label htmlFor="receivedFrom">Received From *</Label>
-              <Input
+              <Select
                 id="receivedFrom"
                 value={formData.receivedFrom}
-                onChange={(e) => setFormData({ ...formData, receivedFrom: e.target.value })}
-                placeholder="Enter sender name"
-                required
+                onChange={(e) => setFormData({ ...formData, receivedFrom: e.target.value, receivedFromDescription: "" })}
                 className="mt-1"
-              />
+                required
+              >
+                <option value="">Select</option>
+                <option value="Ajay">Ajay</option>
+                <option value="Rishav">Rishav</option>
+                <option value="OTHER">Other</option>
+              </Select>
             </div>
+
+            {formData.receivedFrom === "OTHER" && (
+              <div>
+                <Label htmlFor="receivedFromDescription">Description *</Label>
+                <Textarea
+                  id="receivedFromDescription"
+                  value={formData.receivedFromDescription}
+                  onChange={(e) => setFormData({ ...formData, receivedFromDescription: e.target.value })}
+                  placeholder="Enter description"
+                  required
+                  className="mt-1"
+                  rows={2}
+                />
+              </div>
+            )}
 
             <div>
               <Label htmlFor="paymentMode">Payment Mode *</Label>
               <Select
+                id="paymentMode"
                 value={formData.paymentMode}
                 onChange={(e) => setFormData({ ...formData, paymentMode: e.target.value as "CASH" | "GPAY" | "BANK_ACCOUNT" })}
+                className="mt-1"
               >
                 <option value="CASH">Cash</option>
                 <option value="GPAY">GPay</option>
                 <option value="BANK_ACCOUNT">Bank Account</option>
               </Select>
             </div>
-
-            {formData.paymentMode === "GPAY" && (
-              <div>
-                <Label htmlFor="upiId">UPI ID *</Label>
-                <Input
-                  id="upiId"
-                  value={formData.upiId}
-                  onChange={(e) => setFormData({ ...formData, upiId: e.target.value })}
-                  placeholder="Enter UPI ID (e.g., mobile@upi)"
-                  required
-                  className="mt-1"
-                />
-              </div>
-            )}
-
-            {formData.paymentMode === "BANK_ACCOUNT" && (
-              <div>
-                <Label htmlFor="accountNumber">Account Number *</Label>
-                <Input
-                  id="accountNumber"
-                  value={formData.accountNumber}
-                  onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                  placeholder="Enter account number"
-                  required
-                  className="mt-1"
-                />
-              </div>
-            )}
 
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={loading} className="flex-1">

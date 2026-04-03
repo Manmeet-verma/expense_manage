@@ -72,6 +72,14 @@ const forgotPasswordSchema = z.object({
   newEmail: z.string().email("Invalid email address").optional(),
   newPassword: z.string().min(6, "New password must be at least 6 characters"),
 })
+
+const publicSignupSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum(["ADMIN", "MEMBER"]),
+})
+
 const verifyMemberPasswordSchema = z.object({
   memberId: z.string().min(1, "Member ID is required"),
 })
@@ -112,6 +120,39 @@ export async function signup(data: z.infer<typeof signupSchema>) {
 
   revalidatePath("/login")
   revalidatePath("/admin")
+  return { success: true }
+}
+
+export async function publicSignup(data: z.infer<typeof publicSignupSchema>) {
+  const result = publicSignupSchema.safeParse(data)
+
+  if (!result.success) {
+    return { error: result.error.issues[0].message }
+  }
+
+  const { email, name, password, role } = result.data
+  const normalizedEmail = email.trim().toLowerCase()
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+  })
+
+  if (existingUser) {
+    return { error: "Email already registered" }
+  }
+
+  const hashedPassword = await hashPassword(password)
+
+  await prisma.user.create({
+    data: {
+      email: normalizedEmail,
+      name,
+      password: hashedPassword,
+      role,
+    },
+  })
+
+  revalidatePath("/login")
   return { success: true }
 }
 
