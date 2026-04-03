@@ -128,21 +128,21 @@ export function Navigation({ user }: NavProps) {
                 <p className="text-sm font-medium text-gray-900">{user.name || user.email}</p>
                 <p className="text-xs text-gray-500">{user.role}</p>
               </div>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap gap-2">
                 {navItems.filter(item => item.visible).map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
-                      "flex w-full items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer",
+                      "flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer md:hidden",
                       pathname === item.href
-                        ? "text-red-600"
-                        : "text-gray-600"
+                        ? "bg-red-100 text-red-600"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     )}
                   >
                     <item.icon className="h-4 w-4" />
-                    {item.label}
+                    <span className="hidden md:inline">{item.label}</span>
                   </Link>
                 ))}
               </div>
