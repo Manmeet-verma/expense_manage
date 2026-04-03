@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, LogOut, Users, Menu, X, Wallet, PanelLeft, FileText } from "lucide-react"
+import { LayoutDashboard, LogOut, Users, Wallet, PanelLeft, FileText } from "lucide-react"
 
 interface NavProps {
   user: {
@@ -18,7 +18,6 @@ interface NavProps {
 
 export function Navigation({ user }: NavProps) {
   const pathname = usePathname()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const isAdmin = user.role === "ADMIN"
 
   const navItems = [
@@ -78,7 +77,7 @@ export function Navigation({ user }: NavProps) {
                   <span className="font-bold text-base sm:text-xl text-gray-900">My Expense</span>
                 </Link>
               </div>
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-3">
+              <div className="hidden md:flex flex-row items-start md:items-center gap-2 md:gap-3">
                 {navItems.filter(item => item.visible).map((item) => (
                   <Link
                     key={item.href}
@@ -109,53 +108,7 @@ export function Navigation({ user }: NavProps) {
                 Logout
               </Button>
             </div>
-
-            <div className="md:hidden flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setMobileMenuOpen((prev) => !prev)}
-                aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-              >
-                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </Button>
-            </div>
           </div>
-
-          {mobileMenuOpen && (
-            <div className="md:hidden pb-4 space-y-3">
-              <div className="rounded-lg bg-gray-50 p-3">
-                <p className="text-sm font-medium text-gray-900">{user.name || user.email}</p>
-                <p className="text-xs text-gray-500">{user.role}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {navItems.filter(item => item.visible).map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer md:hidden",
-                      pathname === item.href
-                        ? "bg-red-100 text-red-600"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span className="hidden md:inline">{item.label}</span>
-                  </Link>
-                ))}
-              </div>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => signOut({ callbackUrl: "/login" })}
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign out
-              </Button>
-            </div>
-          )}
         </div>
       </nav>
     </Fragment>
