@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, LogOut, Users, Wallet, PanelRight, FileText } from "lucide-react"
+import { LayoutDashboard, LogOut, Users, Wallet, PanelRight, PanelLeft, FileText } from "lucide-react"
 
 interface NavProps {
   user: {
@@ -54,7 +54,11 @@ export function Navigation({ user }: NavProps) {
     },
   ]
 
-  function toggleMobileSidebar() {
+  function toggleSidebar() {
+    window.dispatchEvent(new CustomEvent("toggle-mobile-sidebar"))
+  }
+
+  function toggleMobileMenu() {
     setMobileMenuOpen(!mobileMenuOpen)
   }
 
@@ -69,6 +73,14 @@ export function Navigation({ user }: NavProps) {
           <div className="flex justify-between h-16">
             <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4">
               <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleSidebar}
+                  className="h-8 w-8 p-0"
+                >
+                  <PanelLeft className="w-4 h-4" />
+                </Button>
                 <Link href="/dashboard" className="flex items-center gap-2">
                   <span className="font-bold text-base sm:text-xl text-gray-900">My Expense</span>
                 </Link>
@@ -108,7 +120,7 @@ export function Navigation({ user }: NavProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={toggleMobileSidebar}
+                onClick={toggleMobileMenu}
                 className="h-8 w-8 p-0 md:hidden"
               >
                 <PanelRight className="w-5 h-5" />
@@ -122,7 +134,7 @@ export function Navigation({ user }: NavProps) {
         <>
           <div 
             className="fixed inset-0 bg-black/30 z-40"
-            onClick={toggleMobileSidebar}
+            onClick={toggleMobileMenu}
           />
           <div className="fixed top-0 right-0 z-50 w-64 h-full bg-white shadow-lg animate-slide-in-right">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
@@ -130,7 +142,7 @@ export function Navigation({ user }: NavProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={toggleMobileSidebar}
+                onClick={toggleMobileMenu}
                 className="h-8 w-8 p-0"
               >
                 ✕
