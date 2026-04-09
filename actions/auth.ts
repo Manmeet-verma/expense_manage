@@ -418,6 +418,7 @@ export async function getMembers() {
       id: true,
       name: true,
       email: true,
+      receivedAmount: true,
       createdAt: true,
       expenses: {
         select: {
@@ -437,6 +438,7 @@ export async function getMembers() {
     id: member.id,
     name: member.name,
     email: member.email,
+    receivedAmount: member.receivedAmount,
     createdAt: member.createdAt,
     _count: member._count,
     totalEdits: member.expenses.reduce((sum, expense) => sum + expense.editCount, 0),

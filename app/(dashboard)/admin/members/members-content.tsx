@@ -10,6 +10,7 @@ interface MemberRow {
   id: string
   name: string | null
   email: string
+  receivedAmount: number
   totalEdits: number
   createdAt: Date
   _count: {
@@ -34,7 +35,16 @@ interface MemberExpense {
   adminRemark: string | null
 }
 
-type ExpenseView = "approved" | "rejected" | "pending"
+interface MemberCollection {
+  id: string
+  amount: number
+  receivedFrom: string
+  paymentMode: "CASH" | "GPAY" | "BANK_ACCOUNT"
+  fundDate: string
+  createdAt: string
+}
+
+type ExpenseView = "approved" | "rejected" | "pending" | "collection"
 
 export default function MembersContent({
   members: initialMembers,
@@ -53,6 +63,7 @@ export default function MembersContent({
     rejected: MemberExpense[]
     pending: MemberExpense[]
   }>({ approved: [], rejected: [], pending: [] })
+  const [collectionFunds, setCollectionFunds] = useState<MemberCollection[]>([])
   const members = useMemo(() => initialMembers ?? [], [initialMembers])
 
   async function handleDelete(memberId: string) {
@@ -90,22 +101,35 @@ export default function MembersContent({
     setLoadingExpenses(true)
 
     try {
-      const response = await fetch(`/api/expenses/member/${member.id}`, { method: "GET" })
-      const data = await response.json()
+      const [expensesResponse, collectionsResponse] = await Promise.all([
+        fetch(`/api/expenses/member/${member.id}`, { method: "GET" }),
+        fetch(`/api/funds/statement?userId=${member.id}`, { method: "GET" }),
+      ])
 
-      if (!response.ok) {
-        throw new Error(data?.error || "Failed to load expenses")
+      const [expensesData, collectionsData] = await Promise.all([
+        expensesResponse.json(),
+        collectionsResponse.json(),
+      ])
+
+      if (!expensesResponse.ok) {
+        throw new Error(expensesData?.error || "Failed to load expenses")
+      }
+
+      if (!collectionsResponse.ok) {
+        throw new Error(collectionsData?.error || "Failed to load collections")
       }
 
       setExpensesByStatus({
-        approved: data.approved || [],
-        rejected: data.rejected || [],
-        pending: data.pending || [],
+        approved: expensesData.approved || [],
+        rejected: expensesData.rejected || [],
+        pending: expensesData.pending || [],
       })
+      setCollectionFunds(collectionsData || [])
     } catch (error) {
       console.error("Failed to load member expenses:", error)
       alert("Could not load member expenses")
       setExpensesByStatus({ approved: [], rejected: [], pending: [] })
+      setCollectionFunds([])
     } finally {
       setLoadingExpenses(false)
     }
@@ -177,7 +201,18 @@ export default function MembersContent({
       ? expensesByStatus.approved
       : activeView === "rejected"
         ? expensesByStatus.rejected
-        : expensesByStatus.pending
+        : activeView === "collection"
+          ? collectionFunds
+          : expensesByStatus.pending
+
+  const currentTotal =
+    activeView === "approved"
+      ? expensesByStatus.approved.reduce((sum, expense) => sum + expense.amount, 0)
+      : activeView === "rejected"
+        ? expensesByStatus.rejected.reduce((sum, expense) => sum + expense.amount, 0)
+        : activeView === "collection"
+          ? collectionFunds.reduce((sum, fund) => sum + fund.amount, 0)
+          : expensesByStatus.pending.reduce((sum, expense) => sum + expense.amount, 0)
 
   return (
     <div className="min-h-[calc(100vh-4rem)] p-3 sm:p-6">
@@ -197,6 +232,7 @@ export default function MembersContent({
                   <th className="px-4 py-3 font-semibold">Name</th>
                   <th className="px-4 py-3 font-semibold">Email</th>
                   <th className="px-4 py-3 font-semibold">Expenses</th>
+                  <th className="px-4 py-3 font-semibold">Collection</th>
                   <th className="px-4 py-3 font-semibold">Edits</th>
                   <th className="px-4 py-3 font-semibold">Joined</th>
                   <th className="px-4 py-3 font-semibold">Actions</th>
@@ -205,7 +241,7 @@ export default function MembersContent({
               <tbody>
                 {members.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                    <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
                       No members found
                     </td>
                   </tr>
@@ -222,6 +258,7 @@ export default function MembersContent({
                       </td>
                       <td className="px-4 py-3 text-gray-700">{member.email}</td>
                       <td className="px-4 py-3 text-gray-700">{member._count.expenses}</td>
+                      <td className="px-4 py-3 text-gray-700">{formatCurrency(member.receivedAmount)}</td>
                       <td className="px-4 py-3 text-gray-700">{member.totalEdits}</td>
                       <td className="px-4 py-3 text-gray-700">{formatDate(member.createdAt)}</td>
                       <td className="px-4 py-3">
@@ -265,6 +302,10 @@ export default function MembersContent({
                     <div>
                       <p className="text-gray-500">Expenses</p>
                       <p className="font-medium text-gray-900">{member._count.expenses}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Collection</p>
+                      <p className="font-medium text-gray-900">{formatCurrency(member.receivedAmount)}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Edits</p>
@@ -330,6 +371,12 @@ export default function MembersContent({
               >
                 Pending ({expensesByStatus.pending.length})
               </button>
+              <button
+                onClick={() => setActiveView("collection")}
+                className={`w-full text-left px-3 py-2 text-sm rounded ${activeView === "collection" ? "bg-purple-100 text-purple-700 border border-purple-300" : "bg-gray-50 text-gray-700"}`}
+              >
+                Collection ({collectionFunds.length})
+              </button>
             </div>
 
             {activeView === "pending" && canApproveExpenses && expensesByStatus.pending.length > 0 && (
@@ -352,60 +399,91 @@ export default function MembersContent({
               </div>
             )}
 
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+              <span className="text-gray-600">
+                {activeView === "collection" ? "Total Collection" : "Total Amount"}
+              </span>
+              <span className={`font-semibold ${activeView === "collection" ? "text-purple-700" : "text-gray-900"}`}>
+                {formatCurrency(currentTotal)}
+              </span>
+            </div>
+
             {loadingExpenses ? (
-              <div className="py-8 text-center text-gray-500">Loading expenses...</div>
+              <div className="py-8 text-center text-gray-500">Loading records...</div>
             ) : currentExpenses.length === 0 ? (
-              <div className="py-8 text-center text-gray-500">No expenses found in this section</div>
+              <div className="py-8 text-center text-gray-500">
+                No {activeView === "collection" ? "collections" : "expenses"} found in this section
+              </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-[860px] w-full text-xs sm:text-sm">
+                <table className={`w-full text-xs sm:text-sm ${activeView === "collection" ? "min-w-[760px]" : "min-w-[860px]"}`}>
                   <thead className="bg-gray-50 text-left text-gray-600">
                     <tr>
                       {activeView === "pending" && canApproveExpenses && <th className="px-3 py-2 font-semibold">Select</th>}
-                      <th className="px-3 py-2 font-semibold">Title</th>
-                      <th className="px-3 py-2 font-semibold">Description</th>
-                      <th className="px-3 py-2 font-semibold">Category</th>
-                      <th className="px-3 py-2 font-semibold">Amount</th>
-                      <th className="px-3 py-2 font-semibold">Date</th>
-                      <th className="px-3 py-2 font-semibold">Status</th>
-                      <th className="px-3 py-2 font-semibold">Action</th>
+                      {activeView === "collection" ? (
+                        <>
+                          <th className="px-3 py-2 font-semibold">Date</th>
+                          <th className="px-3 py-2 font-semibold">Received From</th>
+                          <th className="px-3 py-2 font-semibold">Payment Mode</th>
+                          <th className="px-3 py-2 font-semibold">Amount</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="px-3 py-2 font-semibold">Title</th>
+                          <th className="px-3 py-2 font-semibold">Description</th>
+                          <th className="px-3 py-2 font-semibold">Category</th>
+                          <th className="px-3 py-2 font-semibold">Amount</th>
+                          <th className="px-3 py-2 font-semibold">Date</th>
+                          <th className="px-3 py-2 font-semibold">Status</th>
+                          <th className="px-3 py-2 font-semibold">Action</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {currentExpenses.map((expense) => (
-                      <tr key={expense.id} className="border-t border-gray-100">
-                        {activeView === "pending" && canApproveExpenses && (
-                          <td className="px-3 py-2">
-                            <input
-                              type="checkbox"
-                              checked={selectedPendingIds.includes(expense.id)}
-                              onChange={() => togglePendingSelection(expense.id)}
-                            />
-                          </td>
-                        )}
-                        <td className="px-3 py-2 text-gray-900">{expense.title}</td>
-                        <td className="px-3 py-2 text-gray-700">{expense.description || "-"}</td>
-                        <td className="px-3 py-2 text-gray-700">{expense.category}</td>
-                        <td className="px-3 py-2 text-gray-900">{formatCurrency(expense.amount)}</td>
-                        <td className="px-3 py-2 text-gray-700">{formatDate(expense.createdAt)}</td>
-                        <td className="px-3 py-2 text-gray-700">{expense.status}</td>
-                        <td className="px-3 py-2">
-                          {activeView === "pending" && canApproveExpenses ? (
-                            <button
-                              onClick={() => approveSingleExpense(expense.id)}
-                              disabled={approving}
-                              className="px-2 py-1 text-xs rounded bg-green-600 text-white disabled:opacity-50"
-                            >
-                              Approve
-                            </button>
-                          ) : activeView === "pending" ? (
-                            <span className="text-xs text-gray-400">Waiting for supervisor</span>
-                          ) : (
-                            <span className="text-xs text-gray-400">-</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {activeView === "collection"
+                      ? (currentExpenses as MemberCollection[]).map((fund) => (
+                          <tr key={fund.id} className="border-t border-gray-100">
+                            <td className="px-3 py-2 text-gray-700">{formatDate(fund.fundDate)}</td>
+                            <td className="px-3 py-2 text-gray-900">{fund.receivedFrom}</td>
+                            <td className="px-3 py-2 text-gray-700">{fund.paymentMode}</td>
+                            <td className="px-3 py-2 text-gray-900">{formatCurrency(fund.amount)}</td>
+                          </tr>
+                        ))
+                      : (currentExpenses as MemberExpense[]).map((expense) => (
+                          <tr key={expense.id} className="border-t border-gray-100">
+                            {activeView === "pending" && canApproveExpenses && (
+                              <td className="px-3 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedPendingIds.includes(expense.id)}
+                                  onChange={() => togglePendingSelection(expense.id)}
+                                />
+                              </td>
+                            )}
+                            <td className="px-3 py-2 text-gray-900">{expense.title}</td>
+                            <td className="px-3 py-2 text-gray-700">{expense.description || "-"}</td>
+                            <td className="px-3 py-2 text-gray-700">{expense.category}</td>
+                            <td className="px-3 py-2 text-gray-900">{formatCurrency(expense.amount)}</td>
+                            <td className="px-3 py-2 text-gray-700">{formatDate(expense.createdAt)}</td>
+                            <td className="px-3 py-2 text-gray-700">{expense.status}</td>
+                            <td className="px-3 py-2">
+                              {activeView === "pending" && canApproveExpenses ? (
+                                <button
+                                  onClick={() => approveSingleExpense(expense.id)}
+                                  disabled={approving}
+                                  className="px-2 py-1 text-xs rounded bg-green-600 text-white disabled:opacity-50"
+                                >
+                                  Approve
+                                </button>
+                              ) : activeView === "pending" ? (
+                                <span className="text-xs text-gray-400">Waiting for supervisor</span>
+                              ) : (
+                                <span className="text-xs text-gray-400">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
                   </tbody>
                 </table>
               </div>
