@@ -225,7 +225,7 @@ export default function MembersContent({
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white">
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="min-w-[780px] w-full text-xs sm:text-sm">
               <thead className="bg-gray-50 text-left text-gray-600">
                 <tr>
@@ -283,7 +283,7 @@ export default function MembersContent({
             </table>
           </div>
 
-          <div className="hidden divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 md:hidden">
             {members.length === 0 ? (
               <div className="px-4 py-8 text-center text-gray-500">No members found</div>
             ) : (
@@ -298,7 +298,7 @@ export default function MembersContent({
                     </button>
                     <p className="text-sm text-gray-600">{member.email}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                     <div>
                       <p className="text-gray-500">Expenses</p>
                       <p className="font-medium text-gray-900">{member._count.expenses}</p>
@@ -352,7 +352,7 @@ export default function MembersContent({
               </button>
             </div>
 
-            <div className="flex flex-col gap-2 mb-4 max-w-xs">
+            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <button
                 onClick={() => setActiveView("approved")}
                 className={`w-full text-left px-3 py-2 text-sm rounded ${activeView === "approved" ? "bg-green-100 text-green-700 border border-green-300" : "bg-gray-50 text-gray-700"}`}
@@ -380,7 +380,7 @@ export default function MembersContent({
             </div>
 
             {activeView === "pending" && canApproveExpenses && expensesByStatus.pending.length > 0 && (
-              <div className="flex flex-col items-start gap-3 mb-4 max-w-xs">
+              <div className="mb-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                 <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                   <input
                     type="checkbox"
@@ -392,7 +392,7 @@ export default function MembersContent({
                 <button
                   onClick={approveSelectedExpenses}
                   disabled={approving || selectedPendingIds.length === 0}
-                  className="w-full px-3 py-2 text-sm rounded bg-green-600 text-white disabled:opacity-50"
+                  className="w-full px-3 py-2 text-sm rounded bg-green-600 text-white disabled:opacity-50 sm:w-auto"
                 >
                   {approving ? "Approving..." : `Approve Selected (${selectedPendingIds.length})`}
                 </button>

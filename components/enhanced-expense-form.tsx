@@ -34,6 +34,7 @@ export function EnhancedExpenseForm({
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [expenseAmount, setExpenseAmount] = useState(0)
   const [liveTotalAmountUsed, setLiveTotalAmountUsed] = useState(totalAmountUsed)
   const [selectedCategory, setSelectedCategory] = useState<string>(categories[0]?.name || "")
@@ -52,6 +53,7 @@ export function EnhancedExpenseForm({
     e.preventDefault()
     setLoading(true)
     setError("")
+    setSuccess("")
 
     const form = e.currentTarget
     const formData = new FormData(form)
@@ -72,10 +74,12 @@ export function EnhancedExpenseForm({
       form.reset()
       setExpenseAmount(0)
       setLiveTotalAmountUsed((prev) => prev + createdAmount)
+      setSuccess("Expense added successfully")
       void broadcastExpenseChange("member-create")
       router.refresh()
       if (onSuccess) onSuccess()
       setLoading(false)
+      setTimeout(() => setSuccess(""), 2500)
     }
   }
 
@@ -91,6 +95,12 @@ export function EnhancedExpenseForm({
             {error && (
               <div className="bg-red-50 text-red-600 text-xs p-2 rounded">
                 {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="bg-green-50 text-green-700 text-xs p-2 rounded border border-green-100">
+                {success}
               </div>
             )}
 

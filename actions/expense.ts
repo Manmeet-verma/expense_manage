@@ -153,6 +153,8 @@ export async function updateExpense(id: string, data: z.infer<typeof expenseSche
   })
 
   revalidatePath("/dashboard")
+  revalidatePath("/admin")
+  revalidatePath("/admin/members")
   return { success: true }
 }
 
@@ -188,6 +190,8 @@ export async function deleteExpense(id: string) {
   })
 
   revalidatePath("/dashboard")
+  revalidatePath("/admin")
+  revalidatePath("/admin/members")
   return { success: true }
 }
 

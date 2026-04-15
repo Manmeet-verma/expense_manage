@@ -1,15 +1,17 @@
 'use client'
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { Search, CheckCircle, XCircle, Clock, Plus, Wallet } from "lucide-react"
-import { createFund } from "@/actions/expense"
+import { Search, CheckCircle, XCircle, Clock, Plus, Wallet, Edit, Trash2 } from "lucide-react"
+import { createFund, updateExpense, deleteExpense } from "@/actions/expense"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { broadcastExpenseChange } from "@/lib/supabase/realtime"
 
 interface Expense {
   id: string
@@ -20,6 +22,17 @@ interface Expense {
   status: "APPROVED" | "REJECTED" | "PENDING" | "PAID"
   createdAt: Date
 }
+
+const CATEGORIES = [
+  { value: "FREIGHT", label: "Freight/Gaddi" },
+  { value: "PORTER", label: "Porter" },
+  { value: "FOOD", label: "Food" },
+  { value: "OFFICE_GOODS", label: "Office Goods" },
+  { value: "HOTEL", label: "Hotel" },
+  { value: "PETROL", label: "Petrol" },
+  { value: "DIESEL", label: "Diesel" },
+  { value: "OTHER", label: "Other" },
+]
 
 interface MyStatementClientProps {
   userId: string
@@ -193,6 +206,7 @@ function FundDepositModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
 }
 
 export function MyStatementClient({ userId }: MyStatementClientProps) {
+  const router = useRouter()
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
   const [approvedExpenses, setApprovedExpenses] = useState<Expense[]>([])
@@ -202,6 +216,16 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [showFundModal, setShowFundModal] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
+  const [pendingActionLoading, setPendingActionLoading] = useState(false)
+  const [pendingActionError, setPendingActionError] = useState("")
+  const [pendingActionSuccess, setPendingActionSuccess] = useState("")
+  const [editForm, setEditForm] = useState({
+    title: "",
+    description: "",
+    amount: "",
+    category: "",
+  })
 
   async function handleSearch() {
     if (!fromDate || !toDate) return
@@ -234,6 +258,74 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
     }
 
     setLoading(false)
+  }
+
+  function openEditModal(expense: Expense) {
+    setPendingActionError("")
+    setPendingActionSuccess("")
+    setEditingExpense(expense)
+    setEditForm({
+      title: expense.title,
+      description: expense.description || "",
+      amount: expense.amount.toString(),
+      category: expense.category,
+    })
+  }
+
+  function closeEditModal() {
+    if (pendingActionLoading) return
+    setEditingExpense(null)
+  }
+
+  async function handlePendingEditSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!editingExpense) return
+
+    setPendingActionLoading(true)
+    setPendingActionError("")
+
+    const result = await updateExpense(editingExpense.id, {
+      title: editForm.title.trim() || editingExpense.title,
+      description: editForm.description.trim() || undefined,
+      amount: parseFloat(editForm.amount),
+      category: editForm.category,
+    })
+
+    if (result?.error) {
+      setPendingActionError(result.error)
+      setPendingActionLoading(false)
+      return
+    }
+
+    setPendingActionLoading(false)
+    setEditingExpense(null)
+    setPendingActionSuccess("Pending expense updated successfully")
+    void broadcastExpenseChange("member-edit")
+    await handleSearch()
+    router.refresh()
+    setTimeout(() => setPendingActionSuccess(""), 2500)
+  }
+
+  async function handlePendingDelete(expenseId: string) {
+    const confirmed = window.confirm("Delete this pending expense?")
+    if (!confirmed) return
+
+    setPendingActionLoading(true)
+    setPendingActionError("")
+
+    const result = await deleteExpense(expenseId)
+    if (result?.error) {
+      setPendingActionError(result.error)
+      setPendingActionLoading(false)
+      return
+    }
+
+    setPendingActionLoading(false)
+    setPendingActionSuccess("Pending expense deleted successfully")
+    void broadcastExpenseChange("member-delete")
+    await handleSearch()
+    router.refresh()
+    setTimeout(() => setPendingActionSuccess(""), 2500)
   }
 
   const approvedTotal = approvedExpenses.reduce((sum, exp) => sum + exp.amount, 0)
@@ -287,6 +379,17 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
 
       {hasSearched && (
         <>
+          {pendingActionError && (
+            <div className="rounded border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {pendingActionError}
+            </div>
+          )}
+          {pendingActionSuccess && (
+            <div className="rounded border border-green-100 bg-green-50 px-3 py-2 text-xs text-green-700">
+              {pendingActionSuccess}
+            </div>
+          )}
+
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setActiveTab("approved")}
@@ -340,6 +443,7 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
                         <th className="px-3 py-2 font-semibold text-gray-600 text-right">Amount</th>
                         <th className="px-3 py-2 font-semibold text-gray-600 text-right">Day Total</th>
                         <th className="px-3 py-2 font-semibold text-gray-600">Status</th>
+                        {activeTab === "pending" && <th className="px-3 py-2 font-semibold text-gray-600 text-right">Actions</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -365,6 +469,32 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
                                 {activeTab === "approved" ? "Approved" : activeTab === "rejected" ? "Not Approved" : "Pending"}
                               </span>
                             </td>
+                            {activeTab === "pending" && (
+                              <td className="px-3 py-2">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2"
+                                    onClick={() => openEditModal(expense)}
+                                    disabled={pendingActionLoading}
+                                  >
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    className="h-7 px-2"
+                                    onClick={() => void handlePendingDelete(expense.id)}
+                                    disabled={pendingActionLoading}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </td>
+                            )}
                           </tr>
                         )
                       })}
@@ -378,6 +508,82 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
       )}
 
       <FundDepositModal isOpen={showFundModal} onClose={() => setShowFundModal(false)} />
+
+      {editingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-gray-900">Edit Pending Expense</h3>
+                <Button variant="ghost" size="sm" onClick={closeEditModal} disabled={pendingActionLoading}>
+                  ✕
+                </Button>
+              </div>
+
+              <form onSubmit={handlePendingEditSubmit} className="space-y-3">
+                <div>
+                  <Label htmlFor="edit-title">Title</Label>
+                  <Input
+                    id="edit-title"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-category">Category</Label>
+                  <Select
+                    id="edit-category"
+                    value={editForm.category}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, category: e.currentTarget.value }))}
+                    required
+                  >
+                    {CATEGORIES.map((category) => (
+                      <option key={category.value} value={category.value}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-amount">Amount</Label>
+                  <Input
+                    id="edit-amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editForm.amount}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, amount: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-description">Description</Label>
+                  <Textarea
+                    id="edit-description"
+                    rows={3}
+                    value={editForm.description}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
+                    placeholder="Optional description"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <Button type="button" variant="outline" className="flex-1" onClick={closeEditModal} disabled={pendingActionLoading}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={pendingActionLoading}>
+                    {pendingActionLoading ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

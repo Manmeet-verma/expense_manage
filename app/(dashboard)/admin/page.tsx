@@ -104,7 +104,7 @@ export default async function AdminPage() {
           <h2 className="text-lg font-semibold text-gray-900">Expense Review</h2>
         </div>
 
-        <div className="hidden space-y-3">
+        <div className="space-y-3 md:hidden">
           {expenses.length === 0 ? (
             <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-500">
               No expenses submitted yet
@@ -122,7 +122,7 @@ export default async function AdminPage() {
                   <Badge variant={getStatusVariant(expense.status)}>{expense.status}</Badge>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                   <div>
                     <p className="text-gray-500">Amount</p>
                     <p className="font-medium text-gray-900">{formatCurrency(expense.amount)}</p>
@@ -185,7 +185,7 @@ export default async function AdminPage() {
           )}
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+        <div className="hidden overflow-x-auto rounded-lg border border-gray-200 bg-white md:block">
           <table className="min-w-[760px] w-full text-xs sm:text-sm">
             <thead className="bg-gray-50 text-left text-gray-600">
               <tr>
