@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { deleteMember } from "@/actions/auth"
-import { approveOrRejectExpense } from "@/actions/expense"
+import { approveOrRejectExpense, deletePendingMemberExpense, updatePendingMemberExpense } from "@/actions/expense"
 
 interface MemberRow {
   id: string
@@ -46,6 +46,17 @@ interface MemberCollection {
 
 type ExpenseView = "approved" | "rejected" | "pending" | "collection"
 
+const EXPENSE_CATEGORIES = [
+  "FREIGHT",
+  "PORTER",
+  "FOOD",
+  "OFFICE_GOODS",
+  "HOTEL",
+  "PETROL",
+  "DIESEL",
+  "OTHER",
+] as const
+
 export default function MembersContent({
   members: initialMembers,
   canManage = false,
@@ -57,6 +68,15 @@ export default function MembersContent({
   const [activeView, setActiveView] = useState<ExpenseView>("pending")
   const [loadingExpenses, setLoadingExpenses] = useState(false)
   const [approving, setApproving] = useState(false)
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
+  const [expenseActionId, setExpenseActionId] = useState<string | null>(null)
+  const [expenseActionType, setExpenseActionType] = useState<"saving" | "deleting" | null>(null)
+  const [editFormData, setEditFormData] = useState({
+    title: "",
+    description: "",
+    amount: "",
+    category: "OTHER",
+  })
   const [selectedPendingIds, setSelectedPendingIds] = useState<string[]>([])
   const [expensesByStatus, setExpensesByStatus] = useState<{
     approved: MemberExpense[]
@@ -98,6 +118,9 @@ export default function MembersContent({
     setSelectedMember(member)
     setActiveView("pending")
     setSelectedPendingIds([])
+    setEditingExpenseId(null)
+    setExpenseActionId(null)
+    setExpenseActionType(null)
     setLoadingExpenses(true)
 
     try {
@@ -181,6 +204,91 @@ export default function MembersContent({
     setApproving(false)
   }
 
+  function startEditExpense(expense: MemberExpense) {
+    setEditingExpenseId(expense.id)
+    setEditFormData({
+      title: expense.title,
+      description: expense.description || "",
+      amount: String(expense.amount),
+      category: expense.category,
+    })
+  }
+
+  function cancelEditExpense() {
+    setEditingExpenseId(null)
+    setEditFormData({
+      title: "",
+      description: "",
+      amount: "",
+      category: "OTHER",
+    })
+  }
+
+  async function saveEditedExpense(expenseId: string) {
+    const parsedAmount = parseFloat(editFormData.amount)
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      alert("Please enter a valid amount")
+      return
+    }
+
+    if (!editFormData.title.trim()) {
+      alert("Please enter a title")
+      return
+    }
+
+    setExpenseActionId(expenseId)
+    setExpenseActionType("saving")
+
+    const result = await updatePendingMemberExpense(expenseId, {
+      title: editFormData.title.trim(),
+      description: editFormData.description.trim() || undefined,
+      amount: parsedAmount,
+      category: editFormData.category,
+    })
+
+    if (result?.error) {
+      alert(result.error)
+      setExpenseActionId(null)
+      setExpenseActionType(null)
+      return
+    }
+
+    cancelEditExpense()
+    setExpenseActionId(null)
+    setExpenseActionType(null)
+    if (selectedMember) {
+      await openMemberExpenses(selectedMember)
+    }
+  }
+
+  async function deleteExpenseFromPending(expenseId: string) {
+    const confirmed = window.confirm("Are you sure you want to delete this pending expense?")
+    if (!confirmed) {
+      return
+    }
+
+    setExpenseActionId(expenseId)
+    setExpenseActionType("deleting")
+
+    const result = await deletePendingMemberExpense(expenseId)
+    if (result?.error) {
+      alert(result.error)
+      setExpenseActionId(null)
+      setExpenseActionType(null)
+      return
+    }
+
+    if (editingExpenseId === expenseId) {
+      cancelEditExpense()
+    }
+
+    setExpenseActionId(null)
+    setExpenseActionType(null)
+    if (selectedMember) {
+      await openMemberExpenses(selectedMember)
+    }
+  }
+
   function toggleSelectAllPending() {
     if (selectedPendingIds.length === expensesByStatus.pending.length) {
       setSelectedPendingIds([])
@@ -195,6 +303,8 @@ export default function MembersContent({
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     )
   }
+
+  const canManagePendingExpenses = canManage || canApproveExpenses
 
   const currentExpenses =
     activeView === "approved"
@@ -415,78 +525,135 @@ export default function MembersContent({
                 No {activeView === "collection" ? "collections" : "expenses"} found in this section
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className={`w-full text-xs sm:text-sm ${activeView === "collection" ? "min-w-[760px]" : "min-w-[860px]"}`}>
-                  <thead className="bg-gray-50 text-left text-gray-600">
-                    <tr>
-                      {activeView === "pending" && canApproveExpenses && <th className="px-3 py-2 font-semibold">Select</th>}
-                      {activeView === "collection" ? (
-                        <>
-                          <th className="px-3 py-2 font-semibold">Date</th>
-                          <th className="px-3 py-2 font-semibold">Received From</th>
-                          <th className="px-3 py-2 font-semibold">Payment Mode</th>
-                          <th className="px-3 py-2 font-semibold">Amount</th>
-                        </>
-                      ) : (
-                        <>
-                          <th className="px-3 py-2 font-semibold">Title</th>
-                          <th className="px-3 py-2 font-semibold">Description</th>
-                          <th className="px-3 py-2 font-semibold">Category</th>
-                          <th className="px-3 py-2 font-semibold">Amount</th>
-                          <th className="px-3 py-2 font-semibold">Date</th>
-                          <th className="px-3 py-2 font-semibold">Status</th>
-                          <th className="px-3 py-2 font-semibold">Action</th>
-                        </>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeView === "collection"
-                      ? (currentExpenses as MemberCollection[]).map((fund) => (
-                          <tr key={fund.id} className="border-t border-gray-100">
-                            <td className="px-3 py-2 text-gray-700">{formatDate(fund.fundDate)}</td>
-                            <td className="px-3 py-2 text-gray-900">{fund.receivedFrom}</td>
-                            <td className="px-3 py-2 text-gray-700">{fund.paymentMode}</td>
-                            <td className="px-3 py-2 text-gray-900">{formatCurrency(fund.amount)}</td>
-                          </tr>
-                        ))
-                      : (currentExpenses as MemberExpense[]).map((expense) => (
-                          <tr key={expense.id} className="border-t border-gray-100">
+              <>
+                <div className="hidden overflow-x-auto md:block">
+                  <table className={`w-full text-xs sm:text-sm ${activeView === "collection" ? "min-w-[760px]" : "min-w-[860px]"}`}>
+                    <thead className="bg-gray-50 text-left text-gray-600">
+                      <tr>
+                        {activeView === "pending" && canApproveExpenses && <th className="px-3 py-2 font-semibold">Select</th>}
+                        {activeView === "collection" ? (
+                          <>
+                            <th className="px-3 py-2 font-semibold">Date</th>
+                            <th className="px-3 py-2 font-semibold">Received From</th>
+                            <th className="px-3 py-2 font-semibold">Payment Mode</th>
+                            <th className="px-3 py-2 font-semibold">Amount</th>
+                          </>
+                        ) : (
+                          <>
+                            <th className="px-3 py-2 font-semibold">Title</th>
+                            <th className="px-3 py-2 font-semibold">Description</th>
+                            <th className="px-3 py-2 font-semibold">Category</th>
+                            <th className="px-3 py-2 font-semibold">Amount</th>
+                            <th className="px-3 py-2 font-semibold">Date</th>
+                            <th className="px-3 py-2 font-semibold">Status</th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeView === "collection"
+                        ? (currentExpenses as MemberCollection[]).map((fund) => (
+                            <tr key={fund.id} className="border-t border-gray-100">
+                              <td className="px-3 py-2 text-gray-700">{formatDate(fund.fundDate)}</td>
+                              <td className="px-3 py-2 text-gray-900">{fund.receivedFrom}</td>
+                              <td className="px-3 py-2 text-gray-700">{fund.paymentMode}</td>
+                              <td className="px-3 py-2 text-gray-900">{formatCurrency(fund.amount)}</td>
+                            </tr>
+                          ))
+                        : (currentExpenses as MemberExpense[]).map((expense) => {
+                            return (
+                              <tr key={expense.id} className="border-t border-gray-100">
+                                {activeView === "pending" && canApproveExpenses && (
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedPendingIds.includes(expense.id)}
+                                      onChange={() => togglePendingSelection(expense.id)}
+                                    />
+                                  </td>
+                                )}
+                                <td className="px-3 py-2 text-gray-900">{expense.title}</td>
+                                <td className="px-3 py-2 text-gray-700">{expense.description || "-"}</td>
+                                <td className="px-3 py-2 text-gray-700">{expense.category}</td>
+                                <td className="px-3 py-2 text-gray-900">{formatCurrency(expense.amount)}</td>
+                                <td className="px-3 py-2 text-gray-700">{formatDate(expense.createdAt)}</td>
+                                <td className="px-3 py-2 text-gray-700">{expense.status}</td>
+                              </tr>
+                            )
+                          })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="space-y-3 md:hidden">
+                  {activeView === "collection"
+                    ? (currentExpenses as MemberCollection[]).map((fund) => (
+                        <div key={fund.id} className="rounded-lg border border-gray-200 bg-white p-3">
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <p className="text-gray-500">Date</p>
+                            <p className="text-right text-gray-900">{formatDate(fund.fundDate)}</p>
+                            <p className="text-gray-500">Received From</p>
+                            <p className="text-right text-gray-900">{fund.receivedFrom}</p>
+                            <p className="text-gray-500">Payment</p>
+                            <p className="text-right text-gray-900">{fund.paymentMode}</p>
+                            <p className="text-gray-500">Amount</p>
+                            <p className="text-right font-semibold text-gray-900">{formatCurrency(fund.amount)}</p>
+                          </div>
+                        </div>
+                      ))
+                    : (currentExpenses as MemberExpense[]).map((expense) => {
+                        return (
+                          <div key={expense.id} className="rounded-lg border border-gray-200 bg-white p-3 space-y-3">
                             {activeView === "pending" && canApproveExpenses && (
-                              <td className="px-3 py-2">
+                              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                                 <input
                                   type="checkbox"
                                   checked={selectedPendingIds.includes(expense.id)}
                                   onChange={() => togglePendingSelection(expense.id)}
                                 />
-                              </td>
+                                Select for bulk approve
+                              </label>
                             )}
-                            <td className="px-3 py-2 text-gray-900">{expense.title}</td>
-                            <td className="px-3 py-2 text-gray-700">{expense.description || "-"}</td>
-                            <td className="px-3 py-2 text-gray-700">{expense.category}</td>
-                            <td className="px-3 py-2 text-gray-900">{formatCurrency(expense.amount)}</td>
-                            <td className="px-3 py-2 text-gray-700">{formatDate(expense.createdAt)}</td>
-                            <td className="px-3 py-2 text-gray-700">{expense.status}</td>
-                            <td className="px-3 py-2">
-                              {activeView === "pending" && canApproveExpenses ? (
-                                <button
-                                  onClick={() => approveSingleExpense(expense.id)}
-                                  disabled={approving}
-                                  className="px-2 py-1 text-xs rounded bg-green-600 text-white disabled:opacity-50"
-                                >
-                                  Approve
-                                </button>
-                              ) : activeView === "pending" ? (
-                                <span className="text-xs text-gray-400">Waiting for supervisor</span>
-                              ) : (
-                                <span className="text-xs text-gray-400">-</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                  </tbody>
-                </table>
-              </div>
+
+                            <div className="grid grid-cols-1 gap-2 text-sm">
+                              <div>
+                                <p className="text-gray-500">Title</p>
+                                <p className="text-gray-900">{expense.title}</p>
+                              </div>
+
+                              <div>
+                                <p className="text-gray-500">Description</p>
+                                <p className="text-gray-900">{expense.description || "-"}</p>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <p className="text-gray-500">Category</p>
+                                  <p className="text-gray-900">{expense.category}</p>
+                                </div>
+
+                                <div>
+                                  <p className="text-gray-500">Amount</p>
+                                  <p className="font-semibold text-gray-900">{formatCurrency(expense.amount)}</p>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <p className="text-gray-500">Date</p>
+                                  <p className="text-gray-900">{formatDate(expense.createdAt)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-500">Status</p>
+                                  <p className="text-gray-900">{expense.status}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                </div>
+              </>
             )}
           </div>
         )}

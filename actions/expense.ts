@@ -195,6 +195,103 @@ export async function deleteExpense(id: string) {
   return { success: true }
 }
 
+export async function updatePendingMemberExpense(id: string, data: z.infer<typeof expenseSchema>) {
+  const session = await auth()
+
+  if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "SUPERVISOR")) {
+    return { error: "Unauthorized" }
+  }
+
+  const expense = await prisma.expense.findUnique({
+    where: { id },
+    include: {
+      createdBy: {
+        select: {
+          role: true,
+        },
+      },
+    },
+  })
+
+  if (!expense) {
+    return { error: "Expense not found" }
+  }
+
+  if (expense.createdBy.role !== "MEMBER") {
+    return { error: "Only member expenses can be edited here" }
+  }
+
+  if (expense.status !== "PENDING") {
+    return { error: "Only pending expenses can be edited" }
+  }
+
+  const result = expenseSchema.safeParse(data)
+
+  if (!result.success) {
+    return { error: result.error.issues[0].message }
+  }
+
+  const { title, description, amount, category } = result.data
+
+  await prisma.expense.update({
+    where: { id },
+    data: {
+      title: title || category,
+      description,
+      amount,
+      category,
+      editCount: {
+        increment: 1,
+      },
+    },
+  })
+
+  revalidatePath("/dashboard")
+  revalidatePath("/admin")
+  revalidatePath("/admin/members")
+  return { success: true }
+}
+
+export async function deletePendingMemberExpense(id: string) {
+  const session = await auth()
+
+  if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "SUPERVISOR")) {
+    return { error: "Unauthorized" }
+  }
+
+  const expense = await prisma.expense.findUnique({
+    where: { id },
+    include: {
+      createdBy: {
+        select: {
+          role: true,
+        },
+      },
+    },
+  })
+
+  if (!expense) {
+    return { error: "Expense not found" }
+  }
+
+  if (expense.createdBy.role !== "MEMBER") {
+    return { error: "Only member expenses can be deleted here" }
+  }
+
+  if (expense.status !== "PENDING") {
+    return { error: "Only pending expenses can be deleted" }
+  }
+
+  await prisma.expense.delete({
+    where: { id },
+  })
+
+  revalidatePath("/dashboard")
+  revalidatePath("/admin")
+  revalidatePath("/admin/members")
+  return { success: true }
+}
+
 export async function approveOrRejectExpense(data: z.infer<typeof approvalSchema>) {
   const session = await auth()
   
