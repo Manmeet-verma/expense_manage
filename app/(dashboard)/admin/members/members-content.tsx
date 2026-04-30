@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { deleteMember } from "@/actions/auth"
 import { approveOrRejectExpense, deletePendingMemberExpense, updatePendingMemberExpense } from "@/actions/expense"
@@ -63,6 +64,7 @@ export default function MembersContent({
   canApproveExpenses = false,
 }: MembersContentProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedMember, setSelectedMember] = useState<MemberRow | null>(null)
   const [activeView, setActiveView] = useState<ExpenseView>("pending")
@@ -85,6 +87,26 @@ export default function MembersContent({
   }>({ approved: [], rejected: [], pending: [] })
   const [collectionFunds, setCollectionFunds] = useState<MemberCollection[]>([])
   const members = useMemo(() => initialMembers ?? [], [initialMembers])
+
+  useEffect(() => {
+    const memberId = searchParams.get("memberId")
+    const requestedView = searchParams.get("view")
+
+    if (!memberId) {
+      return
+    }
+
+    const matchedMember = members.find((member) => member.id === memberId)
+    if (!matchedMember) {
+      return
+    }
+
+    void openMemberExpenses(matchedMember).then(() => {
+      if (requestedView === "collection") {
+        setActiveView("collection")
+      }
+    })
+  }, [members, searchParams])
 
   async function handleDelete(memberId: string) {
     if (!canManage) {
@@ -201,6 +223,41 @@ export default function MembersContent({
     if (selectedMember) {
       await openMemberExpenses(selectedMember)
     }
+    setApproving(false)
+  }
+
+  async function deleteSelectedExpenses() {
+    if (!canManage) {
+      return
+    }
+
+    if (selectedPendingIds.length === 0) {
+      alert("Please select pending expenses first")
+      return
+    }
+
+    const confirmed = window.confirm(`Delete ${selectedPendingIds.length} selected pending expenses?`)
+    if (!confirmed) {
+      return
+    }
+
+    setApproving(true)
+
+    for (const expenseId of selectedPendingIds) {
+      const result = await deletePendingMemberExpense(expenseId)
+      if (result?.error) {
+        alert(result.error)
+        setApproving(false)
+        return
+      }
+    }
+
+    setSelectedPendingIds([])
+
+    if (selectedMember) {
+      await openMemberExpenses(selectedMember)
+    }
+
     setApproving(false)
   }
 
@@ -499,13 +556,24 @@ export default function MembersContent({
                   />
                   Select All
                 </label>
-                <button
-                  onClick={approveSelectedExpenses}
-                  disabled={approving || selectedPendingIds.length === 0}
-                  className="w-full px-3 py-2 text-sm rounded bg-green-600 text-white disabled:opacity-50 sm:w-auto"
-                >
-                  {approving ? "Approving..." : `Approve Selected (${selectedPendingIds.length})`}
-                </button>
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                  <button
+                    onClick={approveSelectedExpenses}
+                    disabled={approving || selectedPendingIds.length === 0}
+                    className="w-full px-3 py-2 text-sm rounded bg-green-600 text-white disabled:opacity-50 sm:w-auto"
+                  >
+                    {approving ? "Approving..." : `Approve Selected (${selectedPendingIds.length})`}
+                  </button>
+                  {canManage && (
+                    <button
+                      onClick={deleteSelectedExpenses}
+                      disabled={approving || selectedPendingIds.length === 0}
+                      className="w-full px-3 py-2 text-sm rounded bg-red-600 text-white disabled:opacity-50 sm:w-auto"
+                    >
+                      {approving ? "Deleting..." : `Delete Selected (${selectedPendingIds.length})`}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -530,7 +598,7 @@ export default function MembersContent({
                   <table className={`w-full text-xs sm:text-sm ${activeView === "collection" ? "min-w-[760px]" : "min-w-[860px]"}`}>
                     <thead className="bg-gray-50 text-left text-gray-600">
                       <tr>
-                        {activeView === "pending" && canApproveExpenses && <th className="px-3 py-2 font-semibold">Select</th>}
+                        {activeView === "pending" && canManagePendingExpenses && <th className="px-3 py-2 font-semibold">Select</th>}
                         {activeView === "collection" ? (
                           <>
                             <th className="px-3 py-2 font-semibold">Date</th>
@@ -546,6 +614,7 @@ export default function MembersContent({
                             <th className="px-3 py-2 font-semibold">Amount</th>
                             <th className="px-3 py-2 font-semibold">Date</th>
                             <th className="px-3 py-2 font-semibold">Status</th>
+                            {activeView === "pending" && canManagePendingExpenses && <th className="px-3 py-2 font-semibold text-right">Actions</th>}
                           </>
                         )}
                       </tr>
@@ -563,7 +632,7 @@ export default function MembersContent({
                         : (currentExpenses as MemberExpense[]).map((expense) => {
                             return (
                               <tr key={expense.id} className="border-t border-gray-100">
-                                {activeView === "pending" && canApproveExpenses && (
+                                {activeView === "pending" && canManagePendingExpenses && (
                                   <td className="px-3 py-2">
                                     <input
                                       type="checkbox"
@@ -578,6 +647,30 @@ export default function MembersContent({
                                 <td className="px-3 py-2 text-gray-900">{formatCurrency(expense.amount)}</td>
                                 <td className="px-3 py-2 text-gray-700">{formatDate(expense.createdAt)}</td>
                                 <td className="px-3 py-2 text-gray-700">{expense.status}</td>
+                                {activeView === "pending" && canManagePendingExpenses && (
+                                  <td className="px-3 py-2">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => void approveSingleExpense(expense.id)}
+                                        disabled={approving}
+                                        className="rounded bg-green-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                                      >
+                                        Approve
+                                      </button>
+                                      {canManage && (
+                                        <button
+                                          type="button"
+                                          onClick={() => void deleteExpenseFromPending(expense.id)}
+                                          disabled={approving}
+                                          className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                                        >
+                                          Delete
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                )}
                               </tr>
                             )
                           })}
@@ -604,14 +697,14 @@ export default function MembersContent({
                     : (currentExpenses as MemberExpense[]).map((expense) => {
                         return (
                           <div key={expense.id} className="rounded-lg border border-gray-200 bg-white p-3 space-y-3">
-                            {activeView === "pending" && canApproveExpenses && (
+                            {activeView === "pending" && canManagePendingExpenses && (
                               <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                                 <input
                                   type="checkbox"
                                   checked={selectedPendingIds.includes(expense.id)}
                                   onChange={() => togglePendingSelection(expense.id)}
                                 />
-                                Select for bulk approve
+                                Select this expense
                               </label>
                             )}
 
@@ -648,6 +741,29 @@ export default function MembersContent({
                                   <p className="text-gray-900">{expense.status}</p>
                                 </div>
                               </div>
+
+                              {activeView === "pending" && canManagePendingExpenses && (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => void approveSingleExpense(expense.id)}
+                                    disabled={approving}
+                                    className="flex-1 rounded bg-green-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                                  >
+                                    Approve
+                                  </button>
+                                  {canManage && (
+                                    <button
+                                      type="button"
+                                      onClick={() => void deleteExpenseFromPending(expense.id)}
+                                      disabled={approving}
+                                      className="flex-1 rounded bg-red-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         )

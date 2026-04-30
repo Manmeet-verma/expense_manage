@@ -359,12 +359,91 @@ export async function markExpensePaid(data: z.infer<typeof paymentSchema>) {
     return { error: "Only approved expenses can be marked as paid" }
   }
 
-  await prisma.expense.update({
-    where: { id },
-    data: {
-      status: "PAID",
-    },
+  function escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  }
+
+  let mentionedMemberId: string | null = null
+
+  if (expense.description) {
+    const members = await prisma.user.findMany({
+      where: { role: "MEMBER" },
+      select: { id: true, name: true, email: true },
+    })
+
+    const text = expense.description
+    let best: { memberId: string; index: number; length: number; isPayer: boolean } | null = null
+
+    for (const member of members) {
+      const labels = Array.from(new Set([member.name, member.email].filter((v): v is string => Boolean(v && v.trim())).map((v) => v.trim())))
+
+      for (const label of labels) {
+        const re = new RegExp(`\\b${escapeRegExp(label)}\\b`, "i")
+        const match = re.exec(text)
+        if (!match || match.index === undefined) continue
+
+        const candidate = {
+          memberId: member.id,
+          index: match.index,
+          length: match[0].length,
+          isPayer: member.id === expense.createdById,
+        }
+
+        if (
+          !best ||
+          (best.isPayer && !candidate.isPayer) ||
+          (!candidate.isPayer && candidate.index < best.index) ||
+          (!candidate.isPayer && candidate.index === best.index && candidate.length > best.length) ||
+          (candidate.isPayer === best.isPayer && candidate.index < best.index) ||
+          (candidate.isPayer === best.isPayer && candidate.index === best.index && candidate.length > best.length)
+        ) {
+          best = candidate
+        }
+      }
+    }
+
+    if (best && !best.isPayer) {
+      mentionedMemberId = best.memberId
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.expense.update({
+      where: { id },
+      data: {
+        status: "PAID",
+      },
+    })
+
+    if (!mentionedMemberId) return
+
+    const payer = await tx.user.findUnique({
+      where: { id: expense.createdById },
+      select: { name: true, email: true },
+    })
+
+    const receivedFrom = `${payer?.name || payer?.email || "Unknown"} | from expense ${expense.id}`
+
+    await tx.user.update({
+      where: { id: mentionedMemberId },
+      data: { receivedAmount: { increment: expense.amount } },
+    })
+
+    await tx.fund.create({
+      data: {
+        amount: expense.amount,
+        receivedFrom,
+        paymentMode: "CASH",
+        fundDate: new Date(),
+        userId: mentionedMemberId,
+      },
+    })
   })
+
+  if (mentionedMemberId) {
+    revalidatePath(`/dashboard/my-statement`)
+    revalidatePath(`/dashboard/statement`)
+  }
 
   revalidatePath("/admin")
   revalidatePath("/admin/members")

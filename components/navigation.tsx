@@ -67,6 +67,12 @@ export function Navigation({ user }: NavProps) {
       visible: isAdminOrSupervisor,
     },
     {
+      href: "/admin/statement",
+      label: "Statement",
+      icon: FileText,
+      visible: isAdminOrSupervisor,
+    },
+    {
       href: "/admin/create-supervisor",
       label: "Create Supervisor",
       icon: UserPlus,
