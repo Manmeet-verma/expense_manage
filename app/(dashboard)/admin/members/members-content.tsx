@@ -86,22 +86,29 @@ export default function MembersContent({
     pending: MemberExpense[]
   }>({ approved: [], rejected: [], pending: [] })
   const [collectionFunds, setCollectionFunds] = useState<MemberCollection[]>([])
+  const [fromDate, setFromDate] = useState<string>("")
+  const [toDate, setToDate] = useState<string>("")
   const members = useMemo(() => initialMembers ?? [], [initialMembers])
 
   useEffect(() => {
     const memberId = searchParams.get("memberId")
     const requestedView = searchParams.get("view")
+    const fromDateParam = searchParams.get("fromDate")
+    const toDateParam = searchParams.get("toDate")
 
     if (!memberId) {
       return
     }
+
+    setFromDate(fromDateParam || "")
+    setToDate(toDateParam || "")
 
     const matchedMember = members.find((member) => member.id === memberId)
     if (!matchedMember) {
       return
     }
 
-    void openMemberExpenses(matchedMember).then(() => {
+    void openMemberExpenses(matchedMember, fromDateParam, toDateParam).then(() => {
       if (requestedView === "collection") {
         setActiveView("collection")
       }
@@ -136,7 +143,11 @@ export default function MembersContent({
     }
   }
 
-  async function openMemberExpenses(member: MemberRow) {
+  async function openMemberExpenses(member: MemberRow, _fromDate?: string | null, _toDate?: string | null) {
+    // Use passed dates if available, otherwise use state dates
+    const dateFromParam = _fromDate ?? fromDate
+    const dateToParam = _toDate ?? toDate
+
     setSelectedMember(member)
     setActiveView("pending")
     setSelectedPendingIds([])
@@ -146,9 +157,17 @@ export default function MembersContent({
     setLoadingExpenses(true)
 
     try {
+      const params = new URLSearchParams()
+      if (dateFromParam) params.append("fromDate", dateFromParam)
+      if (dateToParam) params.append("toDate", dateToParam)
+
+      // Update state with the dates used
+      setFromDate(dateFromParam)
+      setToDate(dateToParam)
+
       const [expensesResponse, collectionsResponse] = await Promise.all([
-        fetch(`/api/expenses/member/${member.id}`, { method: "GET" }),
-        fetch(`/api/funds/statement?userId=${member.id}`, { method: "GET" }),
+        fetch(`/api/expenses/member/${member.id}?${params.toString()}`, { method: "GET" }),
+        fetch(`/api/funds/statement?userId=${member.id}${params.toString() ? "&" + params.toString() : ""}`, { method: "GET" }),
       ])
 
       const [expensesData, collectionsData] = await Promise.all([

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextResponse, NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
@@ -8,7 +8,7 @@ type RouteContext = {
   }>
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
   const session = await auth()
 
   if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "SUPERVISOR")) {
@@ -21,13 +21,32 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Member ID is required" }, { status: 400 })
   }
 
-  const expenses = await prisma.expense.findMany({
-    where: {
-      createdById: memberId,
-      status: {
-        in: ["APPROVED", "REJECTED", "PENDING"],
-      },
+  const searchParams = request.nextUrl.searchParams
+  const fromDate = searchParams.get("fromDate")
+  const toDate = searchParams.get("toDate")
+
+  const where: any = {
+    createdById: memberId,
+    status: {
+      in: ["APPROVED", "REJECTED", "PENDING"],
     },
+  }
+
+  if (fromDate && toDate) {
+    const fromDateTime = new Date(fromDate)
+    fromDateTime.setHours(0, 0, 0, 0)
+
+    const toDateTime = new Date(toDate)
+    toDateTime.setHours(23, 59, 59, 999)
+
+    where.createdAt = {
+      gte: fromDateTime,
+      lte: toDateTime,
+    }
+  }
+
+  const expenses = await prisma.expense.findMany({
+    where,
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
