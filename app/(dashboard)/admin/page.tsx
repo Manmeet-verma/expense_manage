@@ -39,6 +39,7 @@ export default async function AdminPage() {
 
   const isAdmin = session.user.role === "ADMIN"
   const isSupervisor = session.user.role === "SUPERVISOR"
+  const canReviewPending = isAdmin || isSupervisor
 
   let expenses: Expense[] = []
   try {
@@ -138,7 +139,7 @@ export default async function AdminPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {expense.status === "PENDING" && isSupervisor && (
+                  {expense.status === "PENDING" && canReviewPending && (
                     <>
                       <form action={approveAction} className="flex-1 min-w-[120px]">
                         <input type="hidden" name="id" value={expense.id} />
@@ -220,7 +221,7 @@ export default async function AdminPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-2">
-                        {expense.status === "PENDING" && isSupervisor && (
+                        {expense.status === "PENDING" && canReviewPending && (
                           <>
                             <form action={approveAction}>
                               <input type="hidden" name="id" value={expense.id} />

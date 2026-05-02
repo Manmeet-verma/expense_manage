@@ -23,6 +23,10 @@ const approvalSchema = z.object({
   adminRemark: z.string().optional(),
 })
 
+const bulkApprovalSchema = z.object({
+  ids: z.array(z.string()).min(1, "Select at least one expense"),
+})
+
 const paymentSchema = z.object({
   id: z.string(),
 })
@@ -295,8 +299,8 @@ export async function deletePendingMemberExpense(id: string) {
 export async function approveOrRejectExpense(data: z.infer<typeof approvalSchema>) {
   const session = await auth()
   
-  if (!session?.user || session.user.role !== "SUPERVISOR") {
-    return { error: "Unauthorized - Supervisor access required" }
+  if (!session?.user || (session.user.role !== "SUPERVISOR" && session.user.role !== "ADMIN")) {
+    return { error: "Unauthorized - Admin or supervisor access required" }
   }
 
   const result = approvalSchema.safeParse(data)
@@ -316,7 +320,7 @@ export async function approveOrRejectExpense(data: z.infer<typeof approvalSchema
   }
 
   if (expense.status !== "PENDING") {
-    return { error: "Only pending expenses can be approved or rejected by supervisor" }
+    return { error: "Only pending expenses can be approved or rejected by admin or supervisor" }
   }
 
   await prisma.expense.update({
@@ -329,6 +333,58 @@ export async function approveOrRejectExpense(data: z.infer<typeof approvalSchema
 
   revalidatePath("/admin")
   revalidatePath("/admin/members")
+  return { success: true }
+}
+
+export async function bulkApprovePendingMemberExpenses(data: { ids: string[] }) {
+  const session = await auth()
+
+  if (!session?.user || (session.user.role !== "SUPERVISOR" && session.user.role !== "ADMIN")) {
+    return { error: "Unauthorized - Admin or supervisor access required" }
+  }
+
+  const result = bulkApprovalSchema.safeParse(data)
+
+  if (!result.success) {
+    return { error: result.error.issues[0].message }
+  }
+
+  const ids = [...new Set(result.data.ids.map((id) => id.trim()).filter(Boolean))]
+
+  if (ids.length === 0) {
+    return { error: "Select at least one expense" }
+  }
+
+  const expenses = await prisma.expense.findMany({
+    where: {
+      id: { in: ids },
+      status: "PENDING",
+      createdBy: {
+        role: "MEMBER",
+      },
+    },
+    select: {
+      id: true,
+    },
+  })
+
+  if (expenses.length !== ids.length) {
+    return { error: "One or more selected expenses are no longer pending" }
+  }
+
+  await prisma.$transaction(
+    ids.map((id) =>
+      prisma.expense.update({
+        where: { id },
+        data: { status: "APPROVED" },
+      })
+    )
+  )
+
+  revalidatePath("/dashboard")
+  revalidatePath("/admin")
+  revalidatePath("/admin/members")
+  revalidatePath("/admin/statement")
   return { success: true }
 }
 

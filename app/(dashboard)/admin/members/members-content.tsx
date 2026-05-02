@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { deleteMember } from "@/actions/auth"
-import { approveOrRejectExpense, deletePendingMemberExpense, updatePendingMemberExpense } from "@/actions/expense"
+import {
+  approveOrRejectExpense,
+  bulkApprovePendingMemberExpenses,
+  deletePendingMemberExpense,
+  updatePendingMemberExpense,
+} from "@/actions/expense"
 
 interface MemberRow {
   id: string
@@ -200,7 +205,7 @@ export default function MembersContent({
   }
 
   async function approveSingleExpense(id: string) {
-    if (!canApproveExpenses) {
+    if (!canManagePendingExpenses) {
       return
     }
 
@@ -219,7 +224,7 @@ export default function MembersContent({
   }
 
   async function approveSelectedExpenses() {
-    if (!canApproveExpenses) {
+    if (!canManagePendingExpenses) {
       return
     }
 
@@ -230,13 +235,11 @@ export default function MembersContent({
 
     setApproving(true)
 
-    for (const expenseId of selectedPendingIds) {
-      const result = await approveOrRejectExpense({ id: expenseId, status: "APPROVED" })
-      if (result?.error) {
-        alert(result.error)
-        setApproving(false)
-        return
-      }
+    const result = await bulkApprovePendingMemberExpenses({ ids: selectedPendingIds })
+    if (result?.error) {
+      alert(result.error)
+      setApproving(false)
+      return
     }
 
     if (selectedMember) {
@@ -565,7 +568,7 @@ export default function MembersContent({
               </button>
             </div>
 
-            {activeView === "pending" && canApproveExpenses && expensesByStatus.pending.length > 0 && (
+            {activeView === "pending" && canManagePendingExpenses && expensesByStatus.pending.length > 0 && (
               <div className="mb-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                 <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                   <input
