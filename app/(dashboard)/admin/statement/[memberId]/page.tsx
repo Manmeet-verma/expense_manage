@@ -60,7 +60,13 @@ function renderMentionedMembers(text: string, members: MemberLink[]): ReactNode 
   return parts.length > 0 ? parts : text
 }
 
-export default async function AdminMemberStatementPage({ params }: { params: Promise<{ memberId: string }> }) {
+export default async function AdminMemberStatementPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ memberId: string }>
+  searchParams?: Promise<{ category?: string }>
+}) {
   const session = await auth()
 
   if (!session?.user) {
@@ -72,6 +78,8 @@ export default async function AdminMemberStatementPage({ params }: { params: Pro
   }
 
   const { memberId } = await params
+  const resolvedSearchParams = (await searchParams) ?? {}
+  const selectedCategory = resolvedSearchParams.category?.trim() || "all"
 
   const member = await prisma.user.findUnique({
     where: { id: memberId, role: "MEMBER" },
@@ -167,8 +175,13 @@ export default async function AdminMemberStatementPage({ params }: { params: Pro
     return diff !== 0 ? diff : left.id.localeCompare(right.id)
   })
 
+  const categoryOptions = Array.from(new Set(rows.map((row) => row.category))).sort((a, b) => a.localeCompare(b))
+  const filteredRows = selectedCategory === "all" ? rows : rows.filter((row) => row.category === selectedCategory)
+  const categoryExpenseTotal = filteredRows.reduce((sum, row) => sum + (row.debit ?? 0), 0)
+  const categoryCollectionTotal = filteredRows.reduce((sum, row) => sum + (row.credit ?? 0), 0)
+
   let runningBalance = 0
-  const ledger = rows.map((row) => {
+  const ledger = filteredRows.map((row) => {
     runningBalance += (row.credit ?? 0) - (row.debit ?? 0)
     return { ...row, amount: runningBalance }
   })
@@ -186,6 +199,55 @@ export default async function AdminMemberStatementPage({ params }: { params: Pro
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mt-1">{member.name || member.email}</h1>
           <p className="text-gray-600">{member.email}</p>
+        </div>
+
+        <form method="get" className="flex items-end gap-2 rounded-lg border border-gray-200 bg-white p-3">
+          <div>
+            <label htmlFor="category" className="block text-xs font-medium text-gray-600">
+              Category
+            </label>
+            <select
+              id="category"
+              name="category"
+              defaultValue={selectedCategory}
+              className="mt-1 h-9 min-w-44 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="all">All Categories</option>
+              {categoryOptions.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            className="h-9 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Apply
+          </button>
+        </form>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            {selectedCategory === "all" ? "Total Expense" : "Category Expense Total"}
+          </p>
+          <p className="mt-2 text-2xl font-bold text-gray-900">{formatCurrency(categoryExpenseTotal)}</p>
+          <p className="mt-1 text-xs text-gray-500">Based on the selected category filter</p>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Collection Total</p>
+          <p className="mt-2 text-2xl font-bold text-blue-700">{formatCurrency(categoryCollectionTotal)}</p>
+          <p className="mt-1 text-xs text-gray-500">Collection rows included in the current view</p>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Entries</p>
+          <p className="mt-2 text-2xl font-bold text-gray-900">{ledger.length}</p>
+          <p className="mt-1 text-xs text-gray-500">
+            {selectedCategory === "all" ? "All statement entries" : `Only ${selectedCategory} entries`}
+          </p>
         </div>
       </div>
 

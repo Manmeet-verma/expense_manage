@@ -29,15 +29,21 @@ export function EnhancedExpenseForm({
   budget,
   totalAmountUsed,
   categories,
+  preselectedCategory,
   onSuccess 
-}: EnhancedExpenseFormProps) {
+}: EnhancedExpenseFormProps & { preselectedCategory?: string }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [expenseAmount, setExpenseAmount] = useState(0)
   const [liveTotalAmountUsed, setLiveTotalAmountUsed] = useState(totalAmountUsed)
-  const [selectedCategory, setSelectedCategory] = useState<string>(categories[0]?.name || "")
+  const [selectedCategory, setSelectedCategory] = useState<string>(preselectedCategory || categories[0]?.name || "")
+
+  // Update selectedCategory when preselectedCategory prop changes
+  useEffect(() => {
+    if (preselectedCategory) setSelectedCategory(preselectedCategory)
+  }, [preselectedCategory])
 
   function normalizeOptionalString(value: FormDataEntryValue | null) {
     if (typeof value !== "string") return undefined

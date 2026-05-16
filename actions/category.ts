@@ -37,6 +37,8 @@ const DEFAULT_CATEGORY_NAMES = [
   "Office Goods",
   "Hotel",
   "Fuel",
+  "Advance",
+  "Salary",
 ] as const
 
 function normalizeCategoryName(name: string) {
