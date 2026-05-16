@@ -525,15 +525,24 @@ export async function getExpenseStats() {
     prisma.expense.count({ where: { ...where, status: "PAID" } }),
   ])
 
-  const totalApprovedAmount = await prisma.expense.aggregate({
-    where: { ...where, status: "APPROVED" },
-    _sum: { amount: true },
-  })
-
-  const totalPaidAmount = await prisma.expense.aggregate({
-    where: { ...where, status: "PAID" },
-    _sum: { amount: true },
-  })
+  const [totalApprovedAmount, totalPaidAmount, totalPendingAmount, totalRejectedAmount] = await Promise.all([
+    prisma.expense.aggregate({
+      where: { ...where, status: "APPROVED" },
+      _sum: { amount: true },
+    }),
+    prisma.expense.aggregate({
+      where: { ...where, status: "PAID" },
+      _sum: { amount: true },
+    }),
+    prisma.expense.aggregate({
+      where: { ...where, status: "PENDING" },
+      _sum: { amount: true },
+    }),
+    prisma.expense.aggregate({
+      where: { ...where, status: "REJECTED" },
+      _sum: { amount: true },
+    }),
+  ])
 
   const totalCollectionAmount = await prisma.fund.aggregate({
     where: session.user.role === "ADMIN" ? {} : { userId: session.user.id },
@@ -567,6 +576,8 @@ export async function getExpenseStats() {
     paid,
     totalApprovedAmount: totalApprovedAmount._sum.amount || 0,
     totalPaidAmount: totalPaidAmount._sum.amount || 0,
+    totalPendingAmount: totalPendingAmount._sum.amount || 0,
+    totalRejectedAmount: totalRejectedAmount._sum.amount || 0,
     collectionAmount: totalCollectionAmount._sum.amount || 0,
     totalBudget,
     submittedAmount: submittedTotal,

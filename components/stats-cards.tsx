@@ -14,6 +14,8 @@ interface StatsCardsProps {
     paid?: number
     totalApprovedAmount: number
     totalPaidAmount?: number
+    totalPendingAmount?: number
+    totalRejectedAmount?: number
     collectionAmount?: number
     totalBudget?: number
     submittedAmount?: number
@@ -53,7 +55,7 @@ export function StatsCards({ stats, mode = "member" }: StatsCardsProps) {
     },
     {
       title: "Approved",
-      value: stats.approved,
+      value: formatCurrency(stats.totalApprovedAmount),
       icon: CheckCircle,
       color: "text-green-600",
       bgColor: "bg-green-50",
@@ -61,7 +63,7 @@ export function StatsCards({ stats, mode = "member" }: StatsCardsProps) {
     },
     {
       title: "Pending",
-      value: stats.pending,
+      value: formatCurrency(stats.totalPendingAmount ?? 0),
       icon: Clock,
       color: "text-yellow-600",
       bgColor: "bg-yellow-50",
@@ -69,7 +71,7 @@ export function StatsCards({ stats, mode = "member" }: StatsCardsProps) {
     },
     {
       title: "Rejected",
-      value: stats.rejected,
+      value: formatCurrency(stats.totalRejectedAmount ?? 0),
       icon: XCircle,
       color: "text-red-600",
       bgColor: "bg-red-50",
@@ -77,7 +79,7 @@ export function StatsCards({ stats, mode = "member" }: StatsCardsProps) {
     },
     {
       title: "Paid",
-      value: stats.paid ?? 0,
+      value: formatCurrency(stats.totalPaidAmount ?? 0),
       icon: DollarSign,
       color: "text-teal-600",
       bgColor: "bg-teal-50",
