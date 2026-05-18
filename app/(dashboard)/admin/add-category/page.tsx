@@ -4,6 +4,8 @@ import { CreateCategorySection } from "@/components/forms/create-category-sectio
 import { getCategoryStatistics } from "@/actions/category"
 import { formatCurrency } from "@/lib/utils"
 
+export const dynamic = "force-dynamic"
+
 export default async function AddCategoryPage() {
   const session = await auth()
 
