@@ -98,12 +98,26 @@ export default function MembersContent({
   const [addCategory, setAddCategory] = useState<string>("")
   const [linkMemberId, setLinkMemberId] = useState<string>("")
   const [copied, setCopied] = useState(false)
+  const [descriptionText, setDescriptionText] = useState("")
+
+  useEffect(() => {
+    if (!linkMemberId) {
+      setDescriptionText("")
+      return
+    }
+
+    const member = members.find((m) => m.id === linkMemberId)
+    const name = member?.name || member?.email || ""
+    // Prefill description with member name as an option
+    setDescriptionText(`${name} | `)
+  }, [linkMemberId, members])
 
   function buildPrefillLink(category: string, memberId: string) {
     // include category and target member id for admin convenience
     const params = new URLSearchParams()
     if (category) params.set("category", category)
     if (memberId) params.set("toMember", memberId)
+    if (descriptionText) params.set("description", descriptionText)
     return `${window.location.origin}/dashboard/expense-entry?${params.toString()}`
   }
 
@@ -525,6 +539,16 @@ export default function MembersContent({
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600">Description</label>
+                  <input
+                    value={descriptionText}
+                    onChange={(e) => setDescriptionText(e.target.value)}
+                    placeholder="Optional description: member name will be inserted automatically"
+                    className="mt-1 w-full rounded border border-gray-200 px-2 text-sm h-8"
+                  />
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto">

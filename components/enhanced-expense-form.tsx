@@ -30,8 +30,9 @@ export function EnhancedExpenseForm({
   totalAmountUsed,
   categories,
   preselectedCategory,
+  preselectedDescription,
   onSuccess 
-}: EnhancedExpenseFormProps & { preselectedCategory?: string }) {
+}: EnhancedExpenseFormProps & { preselectedCategory?: string; preselectedDescription?: string }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -39,11 +40,16 @@ export function EnhancedExpenseForm({
   const [expenseAmount, setExpenseAmount] = useState(0)
   const [liveTotalAmountUsed, setLiveTotalAmountUsed] = useState(totalAmountUsed)
   const [selectedCategory, setSelectedCategory] = useState<string>(preselectedCategory || categories[0]?.name || "")
+  const [description, setDescription] = useState<string>(preselectedDescription || "")
 
   // Update selectedCategory when preselectedCategory prop changes
   useEffect(() => {
     if (preselectedCategory) setSelectedCategory(preselectedCategory)
   }, [preselectedCategory])
+
+  useEffect(() => {
+    if (preselectedDescription) setDescription(preselectedDescription)
+  }, [preselectedDescription])
 
   function normalizeOptionalString(value: FormDataEntryValue | null) {
     if (typeof value !== "string") return undefined
@@ -136,6 +142,8 @@ export function EnhancedExpenseForm({
               placeholder="Details..."
               rows={2}
               className="text-xs"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
             />
           </div>
 
