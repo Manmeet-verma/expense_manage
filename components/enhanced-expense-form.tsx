@@ -22,6 +22,11 @@ interface EnhancedExpenseFormProps {
     name: string
     description: string | null
   }>
+  nameOptions: Array<{
+    id: string
+    label: string
+    role: "MEMBER" | "ADMIN"
+  }>
   onSuccess?: () => void
 }
 export function EnhancedExpenseForm({ 
@@ -29,6 +34,7 @@ export function EnhancedExpenseForm({
   budget,
   totalAmountUsed,
   categories,
+  nameOptions,
   preselectedCategory,
   preselectedDescription,
   onSuccess 
@@ -41,6 +47,11 @@ export function EnhancedExpenseForm({
   const [liveTotalAmountUsed, setLiveTotalAmountUsed] = useState(totalAmountUsed)
   const [selectedCategory, setSelectedCategory] = useState<string>(preselectedCategory || categories[0]?.name || "")
   const [description, setDescription] = useState<string>(preselectedDescription || "")
+  const [selectedNameId, setSelectedNameId] = useState<string>("")
+
+  const showNameDropdown = selectedCategory === "Advance" || selectedCategory === "Salary"
+
+  const selectedNameLabel = nameOptions.find((option) => option.id === selectedNameId)?.label || ""
 
   // Update selectedCategory when preselectedCategory prop changes
   useEffect(() => {
@@ -50,6 +61,18 @@ export function EnhancedExpenseForm({
   useEffect(() => {
     if (preselectedDescription) setDescription(preselectedDescription)
   }, [preselectedDescription])
+
+  useEffect(() => {
+    if (!showNameDropdown) {
+      setSelectedNameId("")
+      return
+    }
+
+    if (!selectedNameId && nameOptions.length > 0) {
+      const preferredMember = nameOptions.find((option) => option.role === "MEMBER")
+      setSelectedNameId(preferredMember?.id || nameOptions[0].id)
+    }
+  }, [showNameDropdown, selectedNameId, nameOptions])
 
   function normalizeOptionalString(value: FormDataEntryValue | null) {
     if (typeof value !== "string") return undefined
@@ -71,7 +94,12 @@ export function EnhancedExpenseForm({
     const formData = new FormData(form)
     const data = {
       title: normalizeOptionalString(formData.get("title")),
-      description: normalizeOptionalString(formData.get("description")),
+      description: normalizeOptionalString(
+        [showNameDropdown ? selectedNameLabel : "", formData.get("description")]
+          .map((value) => (typeof value === "string" ? value.trim() : ""))
+          .filter(Boolean)
+          .join(" - ")
+      ),
       amount: parseFloat(formData.get("amount") as string),
       category: formData.get("category") as string,
     }
@@ -133,6 +161,43 @@ export function EnhancedExpenseForm({
                 ))}
               </Select>
             </div>
+
+            {showNameDropdown && (
+              <div className="space-y-1">
+                <Label htmlFor="nameSource" className="text-xs">Name *</Label>
+                <Select
+                  id="nameSource"
+                    value={selectedNameId}
+                    onChange={(e) => setSelectedNameId(e.target.value)}
+                  required
+                  className="h-10 w-full text-sm"
+                >
+                    <option value="">Select name</option>
+                    {nameOptions.some((option) => option.role === "MEMBER") && (
+                      <optgroup label="Members">
+                        {nameOptions
+                          .filter((option) => option.role === "MEMBER")
+                          .map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.label}
+                            </option>
+                          ))}
+                      </optgroup>
+                    )}
+                    {nameOptions.some((option) => option.role === "ADMIN") && (
+                      <optgroup label="Admins">
+                        {nameOptions
+                          .filter((option) => option.role === "ADMIN")
+                          .map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.label}
+                            </option>
+                          ))}
+                      </optgroup>
+                    )}
+                </Select>
+              </div>
+            )}
 
           <div className="space-y-1">
             <Label htmlFor="description" className="text-xs">Description</Label>

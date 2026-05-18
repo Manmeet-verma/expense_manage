@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -99,18 +99,45 @@ export default function MembersContent({
   const [linkMemberId, setLinkMemberId] = useState<string>("")
   const [copied, setCopied] = useState(false)
   const [descriptionText, setDescriptionText] = useState("")
+  const descRef = useRef<HTMLInputElement | null>(null)
 
+  // Do not auto-prefill description; provide a button to insert member name when needed
   useEffect(() => {
     if (!linkMemberId) {
       setDescriptionText("")
       return
     }
 
+    setDescriptionText("")
+  }, [linkMemberId, members])
+
+  function insertMemberNameAtCursor() {
+    if (!linkMemberId) return
     const member = members.find((m) => m.id === linkMemberId)
     const name = member?.name || member?.email || ""
-    // Prefill description with member name as an option
-    setDescriptionText(`${name} | `)
-  }, [linkMemberId, members])
+    if (!name) return
+
+    // insert at current cursor position if possible
+    const el = descRef.current
+    if (!el) {
+      setDescriptionText((prev) => (prev ? `${prev}${name}` : name))
+      return
+    }
+
+    const start = el.selectionStart ?? descriptionText.length
+    const end = el.selectionEnd ?? descriptionText.length
+    const newText = descriptionText.slice(0, start) + name + descriptionText.slice(end)
+    setDescriptionText(newText)
+
+    // restore focus and place cursor after inserted name
+    setTimeout(() => {
+      if (descRef.current) {
+        descRef.current.focus()
+        const pos = start + name.length
+        descRef.current.setSelectionRange(pos, pos)
+      }
+    }, 0)
+  }
 
   function buildPrefillLink(category: string, memberId: string) {
     // include category and target member id for admin convenience
@@ -510,68 +537,6 @@ export default function MembersContent({
               </tbody>
             </table>
           </div>
-            <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3">
-              <div className="flex flex-wrap items-end gap-2">
-                <div>
-                  <label className="block text-xs text-gray-600">Category</label>
-                  <select
-                    className="mt-1 h-8 rounded border border-gray-200 px-2 text-sm"
-                    value={addCategory}
-                    onChange={(e) => setAddCategory(e.target.value)}
-                  >
-                    <option value="">Select category</option>
-                    <option value="Advance">Advance</option>
-                    <option value="Salary">Salary</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-600">Member</label>
-                  <select
-                    className="mt-1 h-8 rounded border border-gray-200 px-2 text-sm"
-                    value={linkMemberId}
-                    onChange={(e) => setLinkMemberId(e.target.value)}
-                  >
-                    <option value="">Select member</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name || m.email}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex-1">
-                  <label className="block text-xs text-gray-600">Description</label>
-                  <input
-                    value={descriptionText}
-                    onChange={(e) => setDescriptionText(e.target.value)}
-                    placeholder="Optional description: member name will be inserted automatically"
-                    className="mt-1 w-full rounded border border-gray-200 px-2 text-sm h-8"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 ml-auto">
-                  <button
-                    onClick={() => {
-                      if (!addCategory || !linkMemberId) return alert('Select category and member')
-                      const url = buildPrefillLink(addCategory, linkMemberId)
-                      window.open(url, '_blank')
-                    }}
-                    className="h-8 rounded bg-blue-600 px-3 text-sm text-white hover:bg-blue-700"
-                  >
-                    Open Link
-                  </button>
-                  <button
-                    onClick={handleCopyLink}
-                    className="h-8 rounded border border-gray-200 px-3 text-sm"
-                  >
-                    {copied ? 'Copied' : 'Copy Link'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
           <div className="divide-y divide-gray-100 md:hidden">
             {members.length === 0 ? (
               <div className="px-4 py-8 text-center text-gray-500">No members found</div>

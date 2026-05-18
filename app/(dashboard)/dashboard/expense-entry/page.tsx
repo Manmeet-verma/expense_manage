@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import { getExpenseStats } from "@/actions/expense"
 import { getCategories } from "@/actions/category"
@@ -17,6 +18,16 @@ export default async function ExpenseEntryPage({ searchParams }: { searchParams?
 
   const stats = await getExpenseStats()
   const categories = await getCategories()
+  const nameOptions = await prisma.user.findMany({
+    where: { role: { in: ["MEMBER", "ADMIN"] } },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+    },
+    orderBy: [{ role: "asc" }, { name: "asc" }, { email: "asc" }],
+  })
 
   const preselectedCategory = searchParams?.category?.trim() || undefined
   const preselectedDescription = searchParams?.description || undefined
@@ -36,6 +47,11 @@ export default async function ExpenseEntryPage({ searchParams }: { searchParams?
               budget={stats.totalBudget || 0}
               totalAmountUsed={stats.submittedAmount || 0}
               categories={categories}
+              nameOptions={nameOptions.map((user) => ({
+                id: user.id,
+                label: user.name || user.email,
+                role: user.role as "MEMBER" | "ADMIN",
+              }))}
               preselectedCategory={preselectedCategory}
               preselectedDescription={preselectedDescription}
             />
