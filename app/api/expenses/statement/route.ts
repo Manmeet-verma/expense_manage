@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 
+// Helper function to parse dates consistently
+function parseDateRange(fromDate: string | null, toDate: string | null) {
+  if (!fromDate || !toDate) return null
+
+  const fromDateTime = new Date(fromDate)
+  fromDateTime.setHours(0, 0, 0, 0)
+
+  const toDateTime = new Date(toDate)
+  toDateTime.setHours(23, 59, 59, 999)
+
+  return { fromDateTime, toDateTime }
+}
+
 export async function GET(request: NextRequest) {
   const session = await auth()
 
@@ -20,17 +33,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const fromDateTime = new Date(fromDate)
-    fromDateTime.setHours(0, 0, 0, 0)
-
-    const toDateTime = new Date(toDate)
-    toDateTime.setHours(23, 59, 59, 999)
+    const dateRange = parseDateRange(fromDate, toDate)
+    if (!dateRange) {
+      return NextResponse.json({ error: "Invalid date range" }, { status: 400 })
+    }
 
     const expenses = await prisma.expense.findMany({
       where: {
         createdAt: {
-          gte: fromDateTime,
-          lte: toDateTime,
+          gte: dateRange.fromDateTime,
+          lte: dateRange.toDateTime,
         },
         status: status as "APPROVED" | "REJECTED" | "PENDING" | "PAID",
         createdById: userId || session.user.id,
@@ -38,6 +50,7 @@ export async function GET(request: NextRequest) {
       orderBy: {
         createdAt: "desc",
       },
+      take: 5000, // Limit results to prevent memory issues
     })
 
     return NextResponse.json(expenses)

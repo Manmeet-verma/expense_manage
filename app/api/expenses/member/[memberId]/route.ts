@@ -21,6 +21,19 @@ type RouteContext = {
   }>
 }
 
+// Helper function to parse dates consistently
+function parseDateRange(fromDate: string | null, toDate: string | null) {
+  if (!fromDate || !toDate) return null
+
+  const fromDateTime = new Date(fromDate)
+  fromDateTime.setHours(0, 0, 0, 0)
+
+  const toDateTime = new Date(toDate)
+  toDateTime.setHours(23, 59, 59, 999)
+
+  return { fromDateTime, toDateTime }
+}
+
 export async function GET(request: NextRequest, context: RouteContext) {
   const session = await auth()
 
@@ -38,6 +51,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const fromDate = searchParams.get("fromDate")
   const toDate = searchParams.get("toDate")
 
+  const dateRange = parseDateRange(fromDate, toDate)
+
   const where: {
     createdById: string
     status: {
@@ -54,16 +69,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     },
   }
 
-  if (fromDate && toDate) {
-    const fromDateTime = new Date(fromDate)
-    fromDateTime.setHours(0, 0, 0, 0)
-
-    const toDateTime = new Date(toDate)
-    toDateTime.setHours(23, 59, 59, 999)
-
+  if (dateRange) {
     where.createdAt = {
-      gte: fromDateTime,
-      lte: toDateTime,
+      gte: dateRange.fromDateTime,
+      lte: dateRange.toDateTime,
     }
   }
 
@@ -80,6 +89,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       createdAt: true,
       adminRemark: true,
     },
+    take: 5000, // Limit results to prevent memory issues
   })
 
   const approved = expenses.filter((expense): expense is MemberExpenseRecord => expense.status === "APPROVED")

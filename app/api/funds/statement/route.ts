@@ -3,6 +3,19 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { buildMemberLinks, buildStatementCollectionRows } from "@/lib/statement"
 
+// Helper function to parse dates consistently
+function parseDateRange(fromDate: string | null, toDate: string | null) {
+  if (!fromDate || !toDate) return null
+
+  const fromDateTime = new Date(fromDate)
+  fromDateTime.setHours(0, 0, 0, 0)
+
+  const toDateTime = new Date(toDate)
+  toDateTime.setHours(23, 59, 59, 999)
+
+  return { fromDateTime, toDateTime }
+}
+
 export async function GET(request: NextRequest) {
   const session = await auth()
 
@@ -17,32 +30,16 @@ export async function GET(request: NextRequest) {
   const targetUserId = userId || session.user.id
 
   try {
-    const members = await prisma.user.findMany({
-      where: { role: "MEMBER" },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-      },
-    })
+    const dateRange = parseDateRange(fromDate, toDate)
 
-    const memberLinks = buildMemberLinks(members)
-
+    // Build where clauses with parsed dates
     const fundsWhere = {
       userId: targetUserId,
-      ...(fromDate && toDate
+      ...(dateRange
         ? {
             fundDate: {
-              gte: (() => {
-                const fromDateTime = new Date(fromDate)
-                fromDateTime.setHours(0, 0, 0, 0)
-                return fromDateTime
-              })(),
-              lte: (() => {
-                const toDateTime = new Date(toDate)
-                toDateTime.setHours(23, 59, 59, 999)
-                return toDateTime
-              })(),
+              gte: dateRange.fromDateTime,
+              lte: dateRange.toDateTime,
             },
           }
         : {}),
@@ -51,25 +48,27 @@ export async function GET(request: NextRequest) {
     const expensesWhere = {
       createdById: { not: targetUserId },
       description: { not: null },
-      ...(fromDate && toDate
+      ...(dateRange
         ? {
             createdAt: {
-              gte: (() => {
-                const fromDateTime = new Date(fromDate)
-                fromDateTime.setHours(0, 0, 0, 0)
-                return fromDateTime
-              })(),
-              lte: (() => {
-                const toDateTime = new Date(toDate)
-                toDateTime.setHours(23, 59, 59, 999)
-                return toDateTime
-              })(),
+              gte: dateRange.fromDateTime,
+              lte: dateRange.toDateTime,
             },
           }
         : {}),
     }
 
-    const [funds, collectionExpenses] = await Promise.all([
+    const [members, funds, collectionExpenses] = await Promise.all([
+      // Only fetch members if needed for display
+      prisma.user.findMany({
+        where: { role: "MEMBER" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+        take: 1000, // Limit to prevent memory issues
+      }),
       prisma.fund.findMany({
         where: fundsWhere,
         orderBy: {
@@ -82,6 +81,7 @@ export async function GET(request: NextRequest) {
           paymentMode: true,
           fundDate: true,
         },
+        take: 5000, // Limit results
       }),
       prisma.expense.findMany({
         where: expensesWhere,
@@ -96,8 +96,11 @@ export async function GET(request: NextRequest) {
           createdAt: true,
           createdById: true,
         },
+        take: 5000, // Limit results
       }),
     ])
+
+    const memberLinks = buildMemberLinks(members)
 
     const collectionRows = buildStatementCollectionRows({
       memberId: targetUserId,
