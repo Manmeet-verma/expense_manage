@@ -180,11 +180,12 @@ export default async function AdminMemberStatementPage({
   const categoryExpenseTotal = filteredRows.reduce((sum, row) => sum + (row.debit ?? 0), 0)
   const categoryCollectionTotal = filteredRows.reduce((sum, row) => sum + (row.credit ?? 0), 0)
 
-  let runningBalance = 0
-  const ledger = filteredRows.map((row) => {
-    runningBalance += (row.credit ?? 0) - (row.debit ?? 0)
-    return { ...row, amount: runningBalance }
-  })
+  const ledger = filteredRows.reduce<LedgerRow[]>((accumulator, row) => {
+    const previousBalance = accumulator.at(-1)?.amount ?? 0
+    const nextBalance = previousBalance + (row.credit ?? 0) - (row.debit ?? 0)
+    accumulator.push({ ...row, amount: nextBalance })
+    return accumulator
+  }, [])
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">

@@ -2,6 +2,19 @@ import { NextResponse, NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
+type ExpenseStatus = "APPROVED" | "REJECTED" | "PENDING"
+
+type MemberExpenseRecord = {
+  id: string
+  title: string
+  description: string | null
+  amount: number
+  category: string
+  status: ExpenseStatus
+  createdAt: Date
+  adminRemark: string | null
+}
+
 type RouteContext = {
   params: Promise<{
     memberId: string
@@ -25,7 +38,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const fromDate = searchParams.get("fromDate")
   const toDate = searchParams.get("toDate")
 
-  const where: any = {
+  const where: {
+    createdById: string
+    status: {
+      in: ExpenseStatus[]
+    }
+    createdAt?: {
+      gte: Date
+      lte: Date
+    }
+  } = {
     createdById: memberId,
     status: {
       in: ["APPROVED", "REJECTED", "PENDING"],
@@ -60,9 +82,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     },
   })
 
-  const approved = expenses.filter((expense) => expense.status === "APPROVED")
-  const rejected = expenses.filter((expense) => expense.status === "REJECTED")
-  const pending = expenses.filter((expense) => expense.status === "PENDING")
+  const approved = expenses.filter((expense): expense is MemberExpenseRecord => expense.status === "APPROVED")
+  const rejected = expenses.filter((expense): expense is MemberExpenseRecord => expense.status === "REJECTED")
+  const pending = expenses.filter((expense): expense is MemberExpenseRecord => expense.status === "PENDING")
 
   return NextResponse.json({ approved, rejected, pending })
 }

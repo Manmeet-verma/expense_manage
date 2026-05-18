@@ -5,7 +5,12 @@ import { getExpenseStats } from "@/actions/expense"
 import { getCategories } from "@/actions/category"
 import { EnhancedExpenseForm } from "@/components/enhanced-expense-form"
 
-export default async function ExpenseEntryPage({ searchParams }: { searchParams?: { category?: string; description?: string } }) {
+type ExpenseEntrySearchParams = {
+  category?: string
+  description?: string
+}
+
+export default async function ExpenseEntryPage({ searchParams }: { searchParams?: Promise<ExpenseEntrySearchParams> }) {
   const session = await auth()
 
   if (!session?.user) {
@@ -29,8 +34,9 @@ export default async function ExpenseEntryPage({ searchParams }: { searchParams?
     orderBy: [{ role: "asc" }, { name: "asc" }, { email: "asc" }],
   })
 
-  const preselectedCategory = searchParams?.category?.trim() || undefined
-  const preselectedDescription = searchParams?.description || undefined
+  const resolvedSearchParams = (await searchParams) || {}
+  const preselectedCategory = resolvedSearchParams.category?.trim() || undefined
+  const preselectedDescription = resolvedSearchParams.description || undefined
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
