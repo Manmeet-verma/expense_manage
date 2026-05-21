@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, parseJsonSafe } from "@/lib/utils"
 import { Search, CheckCircle, XCircle, Clock, DollarSign, List, Edit, Trash2 } from "lucide-react"
 import { updateExpense, deleteExpense } from "@/actions/expense"
 import { Label } from "@/components/ui/label"
@@ -114,10 +114,10 @@ export function StatementClient({ userId }: { userId: string }) {
       ])
 
       const [approvedData, rejectedData, pendingData, collectionData] = await Promise.all([
-        approvedRes.json(),
-        rejectedRes.json(),
-        pendingRes.json(),
-        collectionRes.json(),
+        parseJsonSafe(approvedRes),
+        parseJsonSafe(rejectedRes),
+        parseJsonSafe(pendingRes),
+        parseJsonSafe(collectionRes),
       ])
 
       setApprovedExpenses(approvedData || [])

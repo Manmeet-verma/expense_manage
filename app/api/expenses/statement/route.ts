@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { withTimeout } from "@/lib/db"
 import { auth } from "@/lib/auth"
 
 // Helper function to parse dates consistently
@@ -38,20 +39,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid date range" }, { status: 400 })
     }
 
-    const expenses = await prisma.expense.findMany({
-      where: {
-        createdAt: {
-          gte: dateRange.fromDateTime,
-          lte: dateRange.toDateTime,
+    const expenses = await withTimeout(
+      prisma.expense.findMany({
+        where: {
+          createdAt: {
+            gte: dateRange.fromDateTime,
+            lte: dateRange.toDateTime,
+          },
+          status: status as "APPROVED" | "REJECTED" | "PENDING" | "PAID",
+          createdById: userId || session.user.id,
         },
-        status: status as "APPROVED" | "REJECTED" | "PENDING" | "PAID",
-        createdById: userId || session.user.id,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 5000, // Limit results to prevent memory issues
-    })
+        orderBy: { createdAt: "desc" },
+        take: 5000,
+      }),
+      20_000
+    )
 
     return NextResponse.json(expenses)
   } catch (error) {

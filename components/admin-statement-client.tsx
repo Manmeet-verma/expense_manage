@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, parseJsonSafe } from "@/lib/utils"
 import { Search, CheckCircle, XCircle, Clock } from "lucide-react"
 
 interface Expense {
@@ -50,15 +50,16 @@ export function AdminStatementClient({ userId }: AdminStatementClientProps) {
         userId,
       })
 
+
       const [approvedRes, rejectedRes, pendingRes] = await Promise.all([
         fetch(`/api/expenses/statement?${params.toString()}&status=APPROVED`),
         fetch(`/api/expenses/statement?${params.toString()}&status=REJECTED`),
         fetch(`/api/expenses/statement?${params.toString()}&status=PENDING`),
       ])
 
-      const approvedData = await approvedRes.json()
-      const rejectedData = await rejectedRes.json()
-      const pendingData = await pendingRes.json()
+      const approvedData = await parseJsonSafe(approvedRes)
+      const rejectedData = await parseJsonSafe(rejectedRes)
+      const pendingData = await parseJsonSafe(pendingRes)
 
       setApprovedExpenses(approvedData)
       setRejectedExpenses(rejectedData)

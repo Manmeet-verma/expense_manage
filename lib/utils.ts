@@ -38,3 +38,24 @@ export function getInitials(name: string): string {
     .toUpperCase()
     .slice(0, 2)
 }
+
+export async function parseJsonSafe(res: Response) {
+  const contentType = res.headers.get('content-type') || ''
+  if (contentType.includes('application/json')) {
+    const data = await res.json()
+    if (!res.ok) {
+      const err: any = new Error('HTTP error')
+      err.status = res.status
+      err.body = data
+      throw err
+    }
+    return data
+  }
+
+  // Non-JSON response: read text for diagnostics (could be HTML redirect/login page)
+  const text = await res.text()
+  const err: any = new Error('Non-JSON response')
+  err.status = res.status
+  err.text = text
+  throw err
+}

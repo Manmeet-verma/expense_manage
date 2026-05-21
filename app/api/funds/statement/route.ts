@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { withTimeout } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { buildMemberLinks, buildStatementCollectionRows } from "@/lib/statement"
 
@@ -58,46 +59,51 @@ export async function GET(request: NextRequest) {
         : {}),
     }
 
+    // Run database queries with a timeout to avoid Vercel runtime 300s hangs
     const [members, funds, collectionExpenses] = await Promise.all([
-      // Only fetch members if needed for display
-      prisma.user.findMany({
-        where: { role: "MEMBER" },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-        take: 1000, // Limit to prevent memory issues
-      }),
-      prisma.fund.findMany({
-        where: fundsWhere,
-        orderBy: {
-          createdAt: "desc",
-        },
-        select: {
-          id: true,
-          amount: true,
-          receivedFrom: true,
-          paymentMode: true,
-          fundDate: true,
-        },
-        take: 5000, // Limit results
-      }),
-      prisma.expense.findMany({
-        where: expensesWhere,
-        orderBy: {
-          createdAt: "desc",
-        },
-        select: {
-          id: true,
-          amount: true,
-          description: true,
-          title: true,
-          createdAt: true,
-          createdById: true,
-        },
-        take: 5000, // Limit results
-      }),
+      withTimeout(
+        prisma.user.findMany({
+          where: { role: "MEMBER" },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+          take: 1000,
+        }),
+        15_000
+      ),
+      withTimeout(
+        prisma.fund.findMany({
+          where: fundsWhere,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            amount: true,
+            receivedFrom: true,
+            paymentMode: true,
+            fundDate: true,
+          },
+          take: 5000,
+        }),
+        20_000
+      ),
+      withTimeout(
+        prisma.expense.findMany({
+          where: expensesWhere,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            amount: true,
+            description: true,
+            title: true,
+            createdAt: true,
+            createdById: true,
+          },
+          take: 5000,
+        }),
+        20_000
+      ),
     ])
 
     const memberLinks = buildMemberLinks(members)

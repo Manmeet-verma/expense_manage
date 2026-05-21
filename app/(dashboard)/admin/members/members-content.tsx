@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, parseJsonSafe } from "@/lib/utils"
 import { deleteMember } from "@/actions/auth"
 import {
   approveOrRejectExpense,
@@ -242,17 +242,9 @@ export default function MembersContent({
       ])
 
       const [expensesData, collectionsData] = await Promise.all([
-        expensesResponse.json(),
-        collectionsResponse.json(),
+        parseJsonSafe(expensesResponse),
+        parseJsonSafe(collectionsResponse),
       ])
-
-      if (!expensesResponse.ok) {
-        throw new Error(expensesData?.error || "Failed to load expenses")
-      }
-
-      if (!collectionsResponse.ok) {
-        throw new Error(collectionsData?.error || "Failed to load collections")
-      }
 
       setExpensesByStatus({
         approved: expensesData.approved || [],

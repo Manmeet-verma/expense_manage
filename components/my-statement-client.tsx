@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, parseJsonSafe } from "@/lib/utils"
 import { Search, CheckCircle, XCircle, Clock, Plus, Wallet, Edit, Trash2 } from "lucide-react"
 import { createFund, updateExpense, deleteExpense } from "@/actions/expense"
 import { Label } from "@/components/ui/label"
@@ -246,9 +246,9 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
         fetch(`/api/expenses/statement?${params.toString()}&status=PENDING`),
       ])
 
-      const approvedData = await approvedRes.json()
-      const rejectedData = await rejectedRes.json()
-      const pendingData = await pendingRes.json()
+      const approvedData = await parseJsonSafe(approvedRes)
+      const rejectedData = await parseJsonSafe(rejectedRes)
+      const pendingData = await parseJsonSafe(pendingRes)
 
       setApprovedExpenses(approvedData)
       setRejectedExpenses(rejectedData)
