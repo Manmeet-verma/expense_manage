@@ -15,7 +15,6 @@ CREATE TYPE "ExpenseCategory" AS ENUM (
 
 -- CreateEnum
 CREATE TYPE "ExpenseStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'PAID');
-
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
