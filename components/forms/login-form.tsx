@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,11 +11,16 @@ import { Label } from "@/components/ui/label"
 import { Eye, EyeOff } from "lucide-react"
 
 export function LoginForm() {
-  const router = useRouter()
+  const searchParams = useSearchParams()
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const authError = searchParams.get("error")
+
+  const authErrorMessage = authError
+    ? "Invalid email or password"
+    : ""
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -27,20 +32,16 @@ export function LoginForm() {
     const password = formData.get("password") as string
 
     try {
-      const result = await signIn("credentials", {
+      await signIn("credentials", {
         email,
         password,
         callbackUrl: "/dashboard",
-        redirect: false,
+        redirect: true,
       })
 
-      if (result?.ok && !result.error) {
-        router.replace(result.url || "/dashboard")
-        return
-      }
-
-      setError(result?.error ? "Invalid email or password" : "Unable to sign in. Please try again.")
-    } catch {
+      return
+    } catch (err) {
+      console.error("[LOGIN] signIn failed", err)
       setError("Unable to sign in. Please check your connection and try again.")
     } finally {
       setLoading(false)
@@ -55,9 +56,9 @@ export function LoginForm() {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
-          {error && (
+          {(error || authErrorMessage) && (
             <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">
-              {error}
+              {error || authErrorMessage}
             </div>
           )}
           <div className="space-y-2">

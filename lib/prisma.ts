@@ -10,7 +10,15 @@ function createPrismaClient() {
   // Runtime should prefer pooled DATABASE_URL (Supabase pooler) to avoid max client errors.
   const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL
   if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is not set')
+    throw new Error('Missing database connection string: set DATABASE_URL or DIRECT_URL in deployment environment')
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    console.info('[PRISMA] Environment check', {
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+      hasDirectUrl: Boolean(process.env.DIRECT_URL),
+      poolMax: Number(process.env.PG_POOL_MAX ?? 3),
+    })
   }
 
   const pool = new pg.Pool({

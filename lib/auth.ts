@@ -8,7 +8,16 @@ const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET
 const isProduction = process.env.NODE_ENV === "production"
 
 if (!authSecret) {
-  throw new Error("AUTH_SECRET (or NEXTAUTH_SECRET) is required")
+  throw new Error(
+    "Missing auth secret: set AUTH_SECRET or NEXTAUTH_SECRET in the deployment environment"
+  )
+}
+
+if (isProduction) {
+  console.info("[AUTH] Environment check", {
+    hasAuthSecret: Boolean(process.env.AUTH_SECRET),
+    hasNextAuthSecret: Boolean(process.env.NEXTAUTH_SECRET),
+  })
 }
 
 export const authOptions: NextAuthOptions = {
