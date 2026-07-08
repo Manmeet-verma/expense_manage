@@ -434,15 +434,67 @@ export async function getMembers() {
     orderBy: { createdAt: "desc" },
   })
 
-  return members.map((member) => ({
-    id: member.id,
-    name: member.name,
-    email: member.email,
-    receivedAmount: member.receivedAmount,
-    createdAt: member.createdAt,
-    _count: member._count,
-    totalEdits: member.expenses.reduce((sum, expense) => sum + expense.editCount, 0),
-  }))
+  const memberLinks = members
+    .map((m) => ({ id: m.id, label: (m.name?.trim() || m.email.trim()) }))
+    .filter((m) => m.label.length > 0)
+    .sort((a, b) => b.label.length - a.label.length)
+
+  const allFunds = await prisma.fund.findMany({
+    where: { userId: { in: members.map((m) => m.id) } },
+    select: { id: true, amount: true, receivedFrom: true, userId: true },
+  })
+
+  const fundsByMember = new Map<string, typeof allFunds>()
+  for (const fund of allFunds) {
+    const arr = fundsByMember.get(fund.userId) ?? []
+    arr.push(fund)
+    fundsByMember.set(fund.userId, arr)
+  }
+
+  const otherExpenses = await prisma.expense.findMany({
+    where: {
+      createdById: { notIn: members.map((m) => m.id) },
+      description: { not: null },
+      createdBy: { role: "MEMBER" },
+    },
+    select: { id: true, amount: true, description: true, createdById: true, createdAt: true },
+  })
+
+  function escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  }
+
+  function findMention(text: string): string | null {
+    for (const link of memberLinks) {
+      const matcher = new RegExp(`\\b${escapeRegExp(link.label)}\\b`, "i")
+      if (matcher.test(text)) return link.id
+    }
+    return null
+  }
+
+  const mentionCollectionByMember = new Map<string, number>()
+  for (const exp of otherExpenses) {
+    const sourceText = exp.description?.trim() || ""
+    if (!sourceText) continue
+    const mentionedId = findMention(sourceText)
+    if (mentionedId) {
+      mentionCollectionByMember.set(mentionedId, (mentionCollectionByMember.get(mentionedId) || 0) + exp.amount)
+    }
+  }
+
+  return members.map((member) => {
+    const fundTotal = (fundsByMember.get(member.id) || []).reduce((sum, f) => sum + f.amount, 0)
+    const mentionTotal = mentionCollectionByMember.get(member.id) || 0
+    return {
+      id: member.id,
+      name: member.name,
+      email: member.email,
+      receivedAmount: fundTotal + mentionTotal,
+      createdAt: member.createdAt,
+      _count: member._count,
+      totalEdits: member.expenses.reduce((sum, expense) => sum + expense.editCount, 0),
+    }
+  })
 }
 
 export async function getAdmins() {

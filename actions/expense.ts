@@ -544,10 +544,55 @@ export async function getExpenseStats() {
     }),
   ])
 
-  const totalCollectionAmount = await prisma.fund.aggregate({
-    where: session.user.role === "ADMIN" ? {} : { userId: session.user.id },
-    _sum: { amount: true },
-  })
+  let totalCollectionAmount = 0
+  if (session.user.role === "ADMIN") {
+    const adminCollection = await prisma.fund.aggregate({
+      where: {},
+      _sum: { amount: true },
+    })
+    totalCollectionAmount = adminCollection._sum.amount || 0
+  } else {
+    const fundAgg = await prisma.fund.aggregate({
+      where: { userId: session.user.id },
+      _sum: { amount: true },
+    })
+    totalCollectionAmount = fundAgg._sum.amount || 0
+
+    const allMembers = await prisma.user.findMany({
+      where: { role: "MEMBER" },
+      select: { id: true, name: true, email: true },
+    })
+
+    const memberLinks = allMembers
+      .map((m) => ({ id: m.id, label: (m.name?.trim() || m.email.trim()) }))
+      .filter((m) => m.label.length > 0)
+      .sort((a, b) => b.label.length - a.label.length)
+
+    const otherExpenses = await prisma.expense.findMany({
+      where: {
+        createdById: { not: session.user.id },
+        description: { not: null },
+        createdBy: { role: "MEMBER" },
+      },
+      select: { id: true, amount: true, description: true },
+    })
+
+    function escapeRegExp(value: string) {
+      return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    }
+
+    for (const exp of otherExpenses) {
+      const sourceText = exp.description?.trim() || ""
+      if (!sourceText) continue
+      for (const link of memberLinks) {
+        const matcher = new RegExp(`\\b${escapeRegExp(link.label)}\\b`, "i")
+        if (link.id === session.user.id && matcher.test(sourceText)) {
+          totalCollectionAmount += exp.amount
+          break
+        }
+      }
+    }
+  }
 
   // Get submitted expenses total (PENDING + APPROVED + REJECTED)
   const submittedAmount = await prisma.expense.aggregate({
@@ -578,7 +623,7 @@ export async function getExpenseStats() {
     totalPaidAmount: totalPaidAmount._sum.amount || 0,
     totalPendingAmount: totalPendingAmount._sum.amount || 0,
     totalRejectedAmount: totalRejectedAmount._sum.amount || 0,
-    collectionAmount: totalCollectionAmount._sum.amount || 0,
+    collectionAmount: totalCollectionAmount,
     totalBudget,
     submittedAmount: submittedTotal,
     remainingBudget,
