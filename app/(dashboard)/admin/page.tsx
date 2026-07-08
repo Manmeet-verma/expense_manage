@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { AdminExpenseReviewClient } from "@/components/admin-expense-review-client"
-import { FundDistributionForm } from "@/components/admin-fund-distribution-form"
 
 export default async function AdminPage() {
   const session = await auth()
@@ -24,14 +23,7 @@ export default async function AdminPage() {
         <p className="text-gray-600 mt-1">Review and manage expense approvals</p>
       </div>
 
-      {isAdmin && (
-        <div className="mb-8 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Distribute Fund</h2>
-          <FundDistributionForm />
-        </div>
-      )}
-
-      <div className="mt-8">
+      <div>
         <AdminExpenseReviewClient isAdmin={isAdmin} isSupervisor={isSupervisor} />
       </div>
     </div>

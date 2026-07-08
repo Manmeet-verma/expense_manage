@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { approveOrRejectExpense, markExpensePaid, bulkApprovePendingMemberExpenses } from "@/actions/expense"
+import { approveOrRejectExpense, markExpensePaid, bulkApprovePendingMemberExpenses, updatePendingMemberExpense, deletePendingMemberExpense } from "@/actions/expense"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -39,6 +39,17 @@ type CategoryMemberExpense = {
   amount: number
   createdAt: string
 }
+
+const EXPENSE_CATEGORIES = [
+  "FREIGHT",
+  "PORTER",
+  "FOOD",
+  "OFFICE_GOODS",
+  "HOTEL",
+  "PETROL",
+  "DIESEL",
+  "OTHER",
+] as const
 
 function formatCategory(category: string): string {
   return category
@@ -78,6 +89,12 @@ export function AdminExpenseReviewClient({ isAdmin, isSupervisor }: AdminExpense
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedMemberId, setSelectedMemberId] = useState<string>("")
   const [selectedPendingIds, setSelectedPendingIds] = useState<string[]>([])
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [editDescription, setEditDescription] = useState("")
+  const [editAmount, setEditAmount] = useState("")
+  const [editCategory, setEditCategory] = useState("OTHER")
+  const [editError, setEditError] = useState("")
 
   const canReviewPending = isAdmin || isSupervisor
 
@@ -178,8 +195,6 @@ export function AdminExpenseReviewClient({ isAdmin, isSupervisor }: AdminExpense
   }
 
   async function handleApprove(id: string) {
-    const formData = new FormData()
-    formData.append("id", id)
     const result = await approveOrRejectExpense({ id, status: "APPROVED" })
     if (result?.error) {
       console.error(result.error)
@@ -201,6 +216,65 @@ export function AdminExpenseReviewClient({ isAdmin, isSupervisor }: AdminExpense
 
   async function handlePaid(id: string) {
     const result = await markExpensePaid({ id })
+    if (result?.error) {
+      console.error(result.error)
+      return
+    }
+    router.refresh()
+    fetchExpenses()
+  }
+
+  function startEdit(expense: Expense) {
+    setEditingId(expense.id)
+    setEditTitle(expense.title)
+    setEditDescription(expense.description || "")
+    setEditAmount(String(expense.amount))
+    setEditCategory(expense.category)
+    setEditError("")
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditTitle("")
+    setEditDescription("")
+    setEditAmount("")
+    setEditCategory("OTHER")
+    setEditError("")
+  }
+
+  async function saveEdit(expenseId: string) {
+    const parsedAmount = parseFloat(editAmount)
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setEditError("Amount must be greater than 0")
+      return
+    }
+    if (!editTitle.trim()) {
+      setEditError("Title is required")
+      return
+    }
+
+    setEditError("")
+    const result = await updatePendingMemberExpense(expenseId, {
+      title: editTitle.trim(),
+      description: editDescription.trim() || undefined,
+      amount: parsedAmount,
+      category: editCategory,
+    })
+
+    if (result?.error) {
+      setEditError(result.error)
+      return
+    }
+
+    cancelEdit()
+    router.refresh()
+    fetchExpenses()
+  }
+
+  async function handleDelete(expenseId: string) {
+    if (!confirm("Are you sure you want to delete this pending expense?")) return
+
+    const result = await deletePendingMemberExpense(expenseId)
     if (result?.error) {
       console.error(result.error)
       return
@@ -286,84 +360,100 @@ export function AdminExpenseReviewClient({ isAdmin, isSupervisor }: AdminExpense
             No expenses found for selected date range
           </div>
         ) : (
-          expenses.map((expense) => (
-            <div key={expense.id} className="rounded-lg border border-gray-200 bg-white p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-gray-900">
-                    {expense.createdBy?.name || expense.createdBy?.email || "Unknown"}
-                  </p>
-                  <p className="text-sm text-gray-600">{formatCategory(expense.category)}</p>
+          expenses.map((expense) => {
+            const isEditing = editingId === expense.id
+            return (
+              <div key={expense.id} className="rounded-lg border border-gray-200 bg-white p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-gray-900">
+                      {expense.createdBy?.name || expense.createdBy?.email || "Unknown"}
+                    </p>
+                    <p className="text-sm text-gray-600">{formatCategory(expense.category)}</p>
+                  </div>
+                  <Badge variant={getStatusVariant(expense.status)}>{expense.status}</Badge>
                 </div>
-                <Badge variant={getStatusVariant(expense.status)}>{expense.status}</Badge>
-              </div>
 
-              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                <div>
-                  <p className="text-gray-500">Amount</p>
-                  <p className="font-medium text-gray-900">{formatCurrency(expense.amount)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Date</p>
-                  <p className="font-medium text-gray-900">{formatDate(expense.createdAt)}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-gray-500">Description</p>
-                  <p className="font-medium text-gray-900">{expense.description || "-"}</p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {expense.status === "PENDING" && canReviewPending && (
+                {isEditing ? (
+                  <div className="space-y-3 border-t border-gray-100 pt-3">
+                    {editError && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{editError}</div>}
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Title</p>
+                      <Input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Description</p>
+                      <Input type="text" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Amount</p>
+                        <Input type="number" step="0.01" min="0" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Category</p>
+                        <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                          {EXPENSE_CATEGORIES.map((cat) => <option key={cat} value={cat}>{formatCategory(cat)}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => saveEdit(expense.id)} className="flex-1">Save</Button>
+                      <Button size="sm" variant="outline" onClick={cancelEdit} className="flex-1">Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
                   <>
-                    <Button
-                      onClick={() => handleApprove(expense.id)}
-                      size="sm"
-                      variant="success"
-                      className="flex-1 min-w-[120px]"
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      onClick={() => handleReject(expense.id)}
-                      size="sm"
-                      variant="destructive"
-                      className="flex-1 min-w-[120px]"
-                    >
-                      Reject
-                    </Button>
+                    <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                      <div>
+                        <p className="text-gray-500">Amount</p>
+                        <p className="font-medium text-gray-900">{formatCurrency(expense.amount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Date</p>
+                        <p className="font-medium text-gray-900">{formatDate(expense.createdAt)}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-gray-500">Description</p>
+                        <p className="font-medium text-gray-900">{expense.description || "-"}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {expense.status === "PENDING" && canReviewPending && (
+                        <>
+                          <Button onClick={() => handleApprove(expense.id)} size="sm" variant="success" className="flex-1 min-w-[80px]">Approve</Button>
+                          <Button onClick={() => handleReject(expense.id)} size="sm" variant="destructive" className="flex-1 min-w-[80px]">Reject</Button>
+                          <Button onClick={() => startEdit(expense)} size="sm" variant="outline" className="flex-1 min-w-[80px]">Edit</Button>
+                          <Button onClick={() => handleDelete(expense.id)} size="sm" variant="ghost" className="flex-1 min-w-[80px] text-red-600 hover:bg-red-50">Delete</Button>
+                        </>
+                      )}
+
+                      {expense.status === "PENDING" && isAdmin && (
+                        <span className="text-xs text-gray-500">Waiting for supervisor review</span>
+                      )}
+
+                      {expense.status === "APPROVED" && isAdmin && (
+                        <Button onClick={() => handlePaid(expense.id)} size="sm" variant="default" className="w-full">Mark Paid</Button>
+                      )}
+
+                      {expense.status === "APPROVED" && isSupervisor && (
+                        <span className="text-xs text-gray-500">Sent to admin for payment</span>
+                      )}
+
+                      {expense.status === "PAID" && (
+                        <span className="text-xs text-gray-500">No further action</span>
+                      )}
+
+                      {expense.status === "REJECTED" && (
+                        <span className="text-xs text-gray-500">Rejected by supervisor</span>
+                      )}
+                    </div>
                   </>
                 )}
-
-                {expense.status === "PENDING" && isAdmin && (
-                  <span className="text-xs text-gray-500">Waiting for supervisor review</span>
-                )}
-
-                {expense.status === "APPROVED" && isAdmin && (
-                  <Button
-                    onClick={() => handlePaid(expense.id)}
-                    size="sm"
-                    variant="default"
-                    className="w-full"
-                  >
-                    Mark Paid
-                  </Button>
-                )}
-
-                {expense.status === "APPROVED" && isSupervisor && (
-                  <span className="text-xs text-gray-500">Sent to admin for payment</span>
-                )}
-
-                {expense.status === "PAID" && (
-                  <span className="text-xs text-gray-500">No further action</span>
-                )}
-
-                {expense.status === "REJECTED" && (
-                  <span className="text-xs text-gray-500">Rejected by supervisor</span>
-                )}
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -384,90 +474,99 @@ export function AdminExpenseReviewClient({ isAdmin, isSupervisor }: AdminExpense
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
-                  Loading...
-                </td>
+                <td colSpan={8} className="px-4 py-10 text-center text-gray-500">Loading...</td>
               </tr>
             ) : expenses.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
-                  No expenses found for selected date range
-                </td>
+                <td colSpan={8} className="px-4 py-10 text-center text-gray-500">No expenses found for selected date range</td>
               </tr>
             ) : (
-              expenses.map((expense) => (
-                <tr key={expense.id} className="border-t border-gray-100">
-                  {selectedMemberId && (
-                    <td className="px-4 py-3">
-                      {expense.status === "PENDING" && (
-                        <input
-                          type="checkbox"
-                          checked={selectedPendingIds.includes(expense.id)}
-                          onChange={() => togglePendingSelection(expense.id)}
-                        />
-                      )}
-                    </td>
-                  )}
-                  <td className="px-4 py-3 font-medium text-gray-900">
-                    {expense.createdBy?.name || expense.createdBy?.email || "Unknown"}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700">{formatCategory(expense.category)}</td>
-                  <td className="px-4 py-3 text-gray-700">{expense.description || "-"}</td>
-                  <td className="px-4 py-3 text-gray-900">{formatCurrency(expense.amount)}</td>
-                  <td className="px-4 py-3 text-gray-700">{formatDate(expense.createdAt)}</td>
-                  <td className="px-4 py-3">
-                    <Badge variant={getStatusVariant(expense.status)}>{expense.status}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-2">
-                      {expense.status === "PENDING" && canReviewPending && (
-                        <>
-                          <Button
-                            onClick={() => handleApprove(expense.id)}
-                            size="sm"
-                            variant="success"
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            onClick={() => handleReject(expense.id)}
-                            size="sm"
-                            variant="destructive"
-                          >
-                            Reject
-                          </Button>
-                        </>
-                      )}
+              expenses.map((expense) => {
+                const isEditing = editingId === expense.id
+                return (
+                  <tr key={expense.id} className="border-t border-gray-100">
+                    {selectedMemberId && (
+                      <td className="px-4 py-3">
+                        {expense.status === "PENDING" && (
+                          <input type="checkbox" checked={selectedPendingIds.includes(expense.id)} onChange={() => togglePendingSelection(expense.id)} />
+                        )}
+                      </td>
+                    )}
+                    {isEditing ? (
+                      <>
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          {expense.createdBy?.name || expense.createdBy?.email || "Unknown"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="h-7 w-full rounded border border-gray-300 bg-white px-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            {EXPENSE_CATEGORIES.map((cat) => <option key={cat} value={cat}>{formatCategory(cat)}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Input type="text" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="h-7 text-xs" />
+                        </td>
+                        <td className="px-4 py-3">
+                          <Input type="number" step="0.01" min="0" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className="h-7 w-24 text-xs" />
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">{formatDate(expense.createdAt)}</td>
+                        <td className="px-4 py-3"><Badge variant="warning">Editing</Badge></td>
+                        <td className="px-4 py-3">
+                          {editError && <div className="text-xs text-red-600 mb-1">{editError}</div>}
+                          <div className="flex gap-1">
+                            <Button size="sm" onClick={() => saveEdit(expense.id)}>Save</Button>
+                            <Button size="sm" variant="outline" onClick={cancelEdit}>Cancel</Button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          {expense.createdBy?.name || expense.createdBy?.email || "Unknown"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">{formatCategory(expense.category)}</td>
+                        <td className="px-4 py-3 text-gray-700">{expense.description || "-"}</td>
+                        <td className="px-4 py-3 text-gray-900">{formatCurrency(expense.amount)}</td>
+                        <td className="px-4 py-3 text-gray-700">{formatDate(expense.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant={getStatusVariant(expense.status)}>{expense.status}</Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-2">
+                            {expense.status === "PENDING" && canReviewPending && (
+                              <>
+                                <Button onClick={() => handleApprove(expense.id)} size="sm" variant="success">Approve</Button>
+                                <Button onClick={() => handleReject(expense.id)} size="sm" variant="destructive">Reject</Button>
+                                <Button onClick={() => startEdit(expense)} size="sm" variant="outline">Edit</Button>
+                                <Button onClick={() => handleDelete(expense.id)} size="sm" variant="ghost" className="text-red-600 hover:bg-red-50">Delete</Button>
+                              </>
+                            )}
 
-                      {expense.status === "PENDING" && isAdmin && (
-                        <span className="text-xs text-gray-500">Waiting for supervisor review</span>
-                      )}
+                            {expense.status === "PENDING" && isAdmin && (
+                              <span className="text-xs text-gray-500">Waiting for supervisor review</span>
+                            )}
 
-                      {expense.status === "APPROVED" && isAdmin && (
-                        <Button
-                          onClick={() => handlePaid(expense.id)}
-                          size="sm"
-                          variant="default"
-                        >
-                          Mark Paid
-                        </Button>
-                      )}
+                            {expense.status === "APPROVED" && isAdmin && (
+                              <Button onClick={() => handlePaid(expense.id)} size="sm" variant="default">Mark Paid</Button>
+                            )}
 
-                      {expense.status === "APPROVED" && isSupervisor && (
-                        <span className="text-xs text-gray-500">Sent to admin for payment</span>
-                      )}
+                            {expense.status === "APPROVED" && isSupervisor && (
+                              <span className="text-xs text-gray-500">Sent to admin for payment</span>
+                            )}
 
-                      {expense.status === "PAID" && (
-                        <span className="text-xs text-gray-500">No further action</span>
-                      )}
+                            {expense.status === "PAID" && (
+                              <span className="text-xs text-gray-500">No further action</span>
+                            )}
 
-                      {expense.status === "REJECTED" && (
-                        <span className="text-xs text-gray-500">Rejected by supervisor</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
+                            {expense.status === "REJECTED" && (
+                              <span className="text-xs text-gray-500">Rejected by supervisor</span>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
