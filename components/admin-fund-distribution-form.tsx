@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { distributeFund, getAllMembers } from "@/actions/expense"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ type Member = Awaited<ReturnType<typeof getAllMembers>>[number]
 export function FundDistributionForm() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [membersLoading, setMembersLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState("")
   const [members, setMembers] = useState<Member[]>([])
@@ -22,9 +23,25 @@ export function FundDistributionForm() {
   const [description, setDescription] = useState("")
   const [paymentMode, setPaymentMode] = useState<"CASH" | "GPAY" | "BANK_ACCOUNT">("CASH")
 
+  useEffect(() => {
+    setMembersLoading(true)
+    getAllMembers().then((data) => {
+      setMembers(data)
+      setMembersLoading(false)
+    })
+  }, [])
+
   async function loadMembers() {
+    setMembersLoading(true)
     const data = await getAllMembers()
     setMembers(data)
+    setMembersLoading(false)
+  }
+
+  if (membersLoading) {
+    return (
+      <div className="text-center py-8 text-sm text-gray-500">Loading members...</div>
+    )
   }
 
   if (members.length === 0) {

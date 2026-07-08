@@ -5,7 +5,28 @@ import { redirect } from "next/navigation"
 import { formatCurrency } from "@/lib/utils"
 import { buildMemberLinks, buildStatementCollectionRows } from "@/lib/statement"
 
-export default async function AdminStatementPage() {
+function getTodayString(): string {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, "0")
+  const day = String(today.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function parseDateRange(fromDate: string | null, toDate: string | null) {
+  if (!fromDate || !toDate) return null
+  const fromDateTime = new Date(fromDate)
+  fromDateTime.setHours(0, 0, 0, 0)
+  const toDateTime = new Date(toDate)
+  toDateTime.setHours(23, 59, 59, 999)
+  return { fromDateTime, toDateTime }
+}
+
+export default async function AdminStatementPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ fromDate?: string; toDate?: string }>
+}) {
   const session = await auth()
 
   if (!session?.user) {
@@ -15,6 +36,19 @@ export default async function AdminStatementPage() {
   if (session.user.role !== "ADMIN" && session.user.role !== "SUPERVISOR") {
     redirect("/dashboard")
   }
+
+  const resolvedSearchParams = (await searchParams) ?? {}
+  const fromDate = resolvedSearchParams.fromDate || getTodayString()
+  const toDate = resolvedSearchParams.toDate || getTodayString()
+  const dateRange = parseDateRange(fromDate, toDate)
+
+  const dateFilter = dateRange
+    ? { createdAt: { gte: dateRange.fromDateTime, lte: dateRange.toDateTime } }
+    : {}
+
+  const fundDateFilter = dateRange
+    ? { fundDate: { gte: dateRange.fromDateTime, lte: dateRange.toDateTime } }
+    : {}
 
   const members = await prisma.user.findMany({
     where: { role: "MEMBER" },
@@ -32,14 +66,14 @@ export default async function AdminStatementPage() {
     members.map(async (member) => {
       const [expenseTotalResult, expenseCountResult, funds, collectionExpenses] = await Promise.all([
         prisma.expense.aggregate({
-          where: { createdById: member.id },
+          where: { createdById: member.id, ...dateFilter },
           _sum: { amount: true },
         }),
         prisma.expense.count({
-          where: { createdById: member.id },
+          where: { createdById: member.id, ...dateFilter },
         }),
         prisma.fund.findMany({
-          where: { userId: member.id },
+          where: { userId: member.id, ...fundDateFilter },
           select: {
             id: true,
             amount: true,
@@ -54,6 +88,7 @@ export default async function AdminStatementPage() {
           where: {
             createdById: { not: member.id },
             description: { not: null },
+            ...dateFilter,
           },
           select: {
             id: true,
@@ -93,6 +128,39 @@ export default async function AdminStatementPage() {
         <h1 className="text-2xl font-bold text-gray-900">Statement</h1>
         <p className="mt-1 text-gray-600">Select a member to open the bank-style statement</p>
       </div>
+
+      <form method="get" className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-white p-4">
+        <div>
+          <label htmlFor="fromDate" className="block text-xs font-medium text-gray-600 mb-1">
+            From
+          </label>
+          <input
+            type="date"
+            id="fromDate"
+            name="fromDate"
+            defaultValue={fromDate}
+            className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label htmlFor="toDate" className="block text-xs font-medium text-gray-600 mb-1">
+            To
+          </label>
+          <input
+            type="date"
+            id="toDate"
+            name="toDate"
+            defaultValue={toDate}
+            className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+        <button
+          type="submit"
+          className="h-9 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Search
+        </button>
+      </form>
 
       <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
         <div className="hidden md:block overflow-x-auto">
@@ -159,7 +227,7 @@ export default async function AdminStatementPage() {
                     <p className="text-gray-500">Collection</p>
                     <p className="font-medium text-gray-900">{formatCurrency(member.collectionTotal)}</p>
                   </div>
-                  <div className="col-span-2">
+                  <div>
                     <p className="text-gray-500">Amount</p>
                     <p className={`font-semibold ${member.amount < 0 ? "text-red-700" : "text-gray-900"}`}>
                       {formatCurrency(member.amount)}

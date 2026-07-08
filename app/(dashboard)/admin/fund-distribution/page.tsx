@@ -4,7 +4,19 @@ import { FundDistributionForm } from "@/components/admin-fund-distribution-form"
 import { AdminDistributionTransactionsTable } from "@/components/admin-distribution-transactions-table"
 import { getDistributedFundTransactions } from "@/actions/expense"
 
-export default async function FundDistributionPage() {
+function getTodayString(): string {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, "0")
+  const day = String(today.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+export default async function FundDistributionPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ fromDate?: string; toDate?: string }>
+}) {
   let session = null
   try {
     session = await auth()
@@ -21,7 +33,11 @@ export default async function FundDistributionPage() {
     redirect("/dashboard")
   }
 
-  const transactions = await getDistributedFundTransactions()
+  const resolvedSearchParams = (await searchParams) ?? {}
+  const fromDate = resolvedSearchParams.fromDate || getTodayString()
+  const toDate = resolvedSearchParams.toDate || getTodayString()
+
+  const transactions = await getDistributedFundTransactions(fromDate, toDate)
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
@@ -41,6 +57,39 @@ export default async function FundDistributionPage() {
           </div>
 
           <div className="p-4">
+            <form method="get" className="mb-4 flex flex-wrap items-end gap-3">
+              <div>
+                <label htmlFor="fromDate" className="block text-xs font-medium text-gray-600 mb-1">
+                  From
+                </label>
+                <input
+                  type="date"
+                  id="fromDate"
+                  name="fromDate"
+                  defaultValue={fromDate}
+                  className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label htmlFor="toDate" className="block text-xs font-medium text-gray-600 mb-1">
+                  To
+                </label>
+                <input
+                  type="date"
+                  id="toDate"
+                  name="toDate"
+                  defaultValue={toDate}
+                  className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                className="h-9 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Search
+              </button>
+            </form>
+
             <AdminDistributionTransactionsTable transactions={transactions} />
           </div>
         </div>

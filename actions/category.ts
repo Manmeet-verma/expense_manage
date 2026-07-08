@@ -141,11 +141,20 @@ export async function getCategories() {
   return Array.from(deduped.values())
 }
 
-export async function getCategoryStatistics(): Promise<Array<CategoryRow & { expenseCount: number; totalAmount: number; memberCount: number }>> {
+export async function getCategoryStatistics(fromDate?: string, toDate?: string): Promise<Array<CategoryRow & { expenseCount: number; totalAmount: number; memberCount: number }>> {
   const session = await auth()
 
   if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "SUPERVISOR")) {
     return []
+  }
+
+  let dateFilter: { gte?: Date; lte?: Date } = {}
+  if (fromDate && toDate) {
+    const from = new Date(fromDate)
+    from.setHours(0, 0, 0, 0)
+    const to = new Date(toDate)
+    to.setHours(23, 59, 59, 999)
+    dateFilter = { gte: from, lte: to }
   }
 
   const [categories, expenses] = await Promise.all([
@@ -154,10 +163,10 @@ export async function getCategoryStatistics(): Promise<Array<CategoryRow & { exp
       FROM "Category"
       ORDER BY "createdAt" DESC
     `,
-    prisma.$queryRaw<ExpenseUsageRow[]>`
-      SELECT "category", "amount", "createdById"
-      FROM "Expense"
-    `,
+    prisma.expense.findMany({
+      select: { category: true, amount: true, createdById: true, createdAt: true },
+      where: Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : undefined,
+    }),
   ])
 
   const usageMap = expenses.reduce<Map<string, CategoryUsageRow>>(
@@ -216,7 +225,7 @@ export async function getCategoryStatistics(): Promise<Array<CategoryRow & { exp
   })
 }
 
-export async function getCategoryMemberExpenses(data: z.infer<typeof categoryMembersSchema>) {
+export async function getCategoryMemberExpenses(data: z.infer<typeof categoryMembersSchema> & { fromDate?: string; toDate?: string }) {
   const session = await auth()
 
   if (!session?.user || session.user.role !== "ADMIN") {
@@ -236,12 +245,23 @@ export async function getCategoryMemberExpenses(data: z.infer<typeof categoryMem
   }
 
   const normalizedCategory = normalizeCategoryName(result.data.categoryName)
+  const { fromDate, toDate } = data
+
+  let dateFilter: { gte?: Date; lte?: Date } = {}
+  if (fromDate && toDate) {
+    const from = new Date(fromDate)
+    from.setHours(0, 0, 0, 0)
+    const to = new Date(toDate)
+    to.setHours(23, 59, 59, 999)
+    dateFilter = { gte: from, lte: to }
+  }
 
   const expenses = await prisma.expense.findMany({
     where: {
       createdBy: {
         role: "MEMBER",
       },
+      ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
     },
     select: {
       id: true,

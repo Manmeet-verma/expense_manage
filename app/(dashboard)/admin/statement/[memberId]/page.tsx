@@ -16,6 +16,23 @@ type LedgerRow = {
   amount: number
 }
 
+function getTodayString(): string {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, "0")
+  const day = String(today.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function parseDateRange(fromDate: string | null, toDate: string | null) {
+  if (!fromDate || !toDate) return null
+  const fromDateTime = new Date(fromDate)
+  fromDateTime.setHours(0, 0, 0, 0)
+  const toDateTime = new Date(toDate)
+  toDateTime.setHours(23, 59, 59, 999)
+  return { fromDateTime, toDateTime }
+}
+
 function formatCategory(category: string): string {
   if (category === "OFFICE_GOODS") return "Office Goods"
   if (category === "FREIGHT") return "Freight/Gaddi"
@@ -65,7 +82,7 @@ export default async function AdminMemberStatementPage({
   searchParams,
 }: {
   params: Promise<{ memberId: string }>
-  searchParams?: Promise<{ category?: string }>
+  searchParams?: Promise<{ category?: string; fromDate?: string; toDate?: string }>
 }) {
   const session = await auth()
 
@@ -80,6 +97,17 @@ export default async function AdminMemberStatementPage({
   const { memberId } = await params
   const resolvedSearchParams = (await searchParams) ?? {}
   const selectedCategory = resolvedSearchParams.category?.trim() || "all"
+  const fromDate = resolvedSearchParams.fromDate || getTodayString()
+  const toDate = resolvedSearchParams.toDate || getTodayString()
+  const dateRange = parseDateRange(fromDate, toDate)
+
+  const dateFilter = dateRange
+    ? { createdAt: { gte: dateRange.fromDateTime, lte: dateRange.toDateTime } }
+    : {}
+
+  const fundDateFilter = dateRange
+    ? { fundDate: { gte: dateRange.fromDateTime, lte: dateRange.toDateTime } }
+    : {}
 
   const member = await prisma.user.findUnique({
     where: { id: memberId, role: "MEMBER" },
@@ -103,7 +131,7 @@ export default async function AdminMemberStatementPage({
 
   const [expenses, collectionExpenses, funds] = await Promise.all([
     prisma.expense.findMany({
-      where: { createdById: member.id },
+      where: { createdById: member.id, ...dateFilter },
       orderBy: [{ createdAt: "asc" }],
       select: {
         id: true,
@@ -118,6 +146,7 @@ export default async function AdminMemberStatementPage({
       where: {
         createdById: { not: member.id },
         description: { not: null },
+        ...dateFilter,
       },
       orderBy: [{ createdAt: "asc" }],
       select: {
@@ -130,7 +159,7 @@ export default async function AdminMemberStatementPage({
       },
     }),
     prisma.fund.findMany({
-      where: { userId: member.id },
+      where: { userId: member.id, ...fundDateFilter },
       orderBy: [{ fundDate: "asc" }],
       select: {
         id: true,
@@ -202,7 +231,31 @@ export default async function AdminMemberStatementPage({
           <p className="text-gray-600">{member.email}</p>
         </div>
 
-        <form method="get" className="flex items-end gap-2 rounded-lg border border-gray-200 bg-white p-3">
+        <form method="get" className="flex flex-wrap items-end gap-2 rounded-lg border border-gray-200 bg-white p-3">
+          <div>
+            <label htmlFor="fromDate" className="block text-xs font-medium text-gray-600">
+              From
+            </label>
+            <input
+              type="date"
+              id="fromDate"
+              name="fromDate"
+              defaultValue={fromDate}
+              className="mt-1 h-9 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label htmlFor="toDate" className="block text-xs font-medium text-gray-600">
+              To
+            </label>
+            <input
+              type="date"
+              id="toDate"
+              name="toDate"
+              defaultValue={toDate}
+              className="mt-1 h-9 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
           <div>
             <label htmlFor="category" className="block text-xs font-medium text-gray-600">
               Category

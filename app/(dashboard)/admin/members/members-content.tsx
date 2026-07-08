@@ -91,8 +91,15 @@ export default function MembersContent({
     pending: MemberExpense[]
   }>({ approved: [], rejected: [], pending: [] })
   const [collectionFunds, setCollectionFunds] = useState<MemberCollection[]>([])
-  const [fromDate, setFromDate] = useState<string>("")
-  const [toDate, setToDate] = useState<string>("")
+  function getTodayString(): string {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, "0")
+    const day = String(today.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }
+  const [fromDate, setFromDate] = useState<string>(getTodayString())
+  const [toDate, setToDate] = useState<string>(getTodayString())
   const members = useMemo(() => initialMembers ?? [], [initialMembers])
 
   const [addCategory, setAddCategory] = useState<string>("")
@@ -170,8 +177,8 @@ export default function MembersContent({
       return
     }
 
-    setFromDate(fromDateParam || "")
-    setToDate(toDateParam || "")
+    if (fromDateParam) setFromDate(fromDateParam)
+    if (toDateParam) setToDate(toDateParam)
 
     const matchedMember = members.find((member) => member.id === memberId)
     if (!matchedMember) {
@@ -470,6 +477,42 @@ export default function MembersContent({
             {canManage ? "Admin access: manage member accounts" : "Supervisor access: view member accounts"}
           </p>
         </div>
+
+        <form
+          onSubmit={(e) => { e.preventDefault(); if (selectedMember) openMemberExpenses(selectedMember); }}
+          className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-white p-4"
+        >
+          <div>
+            <label htmlFor="memberFromDate" className="block text-xs font-medium text-gray-600 mb-1">
+              From
+            </label>
+            <input
+              type="date"
+              id="memberFromDate"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label htmlFor="memberToDate" className="block text-xs font-medium text-gray-600 mb-1">
+              To
+            </label>
+            <input
+              type="date"
+              id="memberToDate"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+          <button
+            type="submit"
+            className="h-9 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Search
+          </button>
+        </form>
 
         <div className="rounded-lg border border-gray-200 bg-white">
           <div className="hidden overflow-x-auto md:block">

@@ -948,11 +948,20 @@ export async function deleteDistributedFundTransaction(
   return { success: true }
 }
 
-export async function getDistributedFundTransactions() {
+export async function getDistributedFundTransactions(fromDate?: string, toDate?: string) {
   const session = await auth()
 
   if (!session?.user || session.user.role !== "ADMIN") {
     return []
+  }
+
+  let dateFilter: { gte?: Date; lte?: Date } = {}
+  if (fromDate && toDate) {
+    const from = new Date(fromDate)
+    from.setHours(0, 0, 0, 0)
+    const to = new Date(toDate)
+    to.setHours(23, 59, 59, 999)
+    dateFilter = { gte: from, lte: to }
   }
 
   return await prisma.fund.findMany({
@@ -960,6 +969,7 @@ export async function getDistributedFundTransactions() {
       receivedFrom: {
         startsWith: ADMIN_DISTRIBUTION_PREFIX,
       },
+      ...(Object.keys(dateFilter).length > 0 ? { fundDate: dateFilter } : {}),
     },
     select: {
       id: true,

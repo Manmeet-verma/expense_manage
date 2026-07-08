@@ -23,9 +23,11 @@ type CategoryMemberExpense = {
 
 interface AdminCategoryUsageSectionProps {
   categories: Category[]
+  fromDate?: string
+  toDate?: string
 }
 
-export function AdminCategoryUsageSection({ categories }: AdminCategoryUsageSectionProps) {
+export function AdminCategoryUsageSection({ categories, fromDate, toDate }: AdminCategoryUsageSectionProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [memberExpenses, setMemberExpenses] = useState<CategoryMemberExpense[]>([])
   const [loading, setLoading] = useState(false)
@@ -36,7 +38,7 @@ export function AdminCategoryUsageSection({ categories }: AdminCategoryUsageSect
     setLoading(true)
     setError("")
 
-    const result = await getCategoryMemberExpenses({ categoryName })
+    const result = await getCategoryMemberExpenses({ categoryName, fromDate, toDate })
 
     if (result.error) {
       setError(result.error)
