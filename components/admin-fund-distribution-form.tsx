@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { distributeFund, getAllMembers } from "@/actions/expense"
+import { distributeFund, getAllMembers, createMemberByName } from "@/actions/expense"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,6 +10,8 @@ import { formatCurrency } from "@/lib/utils"
 import { DollarSign } from "lucide-react"
 
 type Member = Awaited<ReturnType<typeof getAllMembers>>[number]
+
+const OTHER_VALUE = "__other__"
 
 export function FundDistributionForm() {
   const router = useRouter()
@@ -19,6 +21,7 @@ export function FundDistributionForm() {
   const [error, setError] = useState("")
   const [members, setMembers] = useState<Member[]>([])
   const [selectedMember, setSelectedMember] = useState("")
+  const [otherName, setOtherName] = useState("")
   const [amount, setAmount] = useState("")
   const [description, setDescription] = useState("")
   const [paymentMode, setPaymentMode] = useState<"CASH" | "GPAY" | "BANK_ACCOUNT">("CASH")
@@ -59,15 +62,35 @@ export function FundDistributionForm() {
     setLoading(true)
     setError("")
 
-    const result = await distributeFund({
-      memberId: selectedMember,
+    let memberId = selectedMember
+
+    if (selectedMember === OTHER_VALUE) {
+      const name = otherName.trim()
+      if (!name) {
+        setError("Please enter a name")
+        setLoading(false)
+        return
+      }
+      const res = await createMemberByName({ name })
+      if (res.error) {
+        setError(res.error)
+        setLoading(false)
+        return
+      }
+      const newMember = res as { id: string; name: string; email: string }
+      memberId = newMember.id
+      setMembers((prev) => [...prev, { id: newMember.id, name: newMember.name, email: newMember.email, receivedAmount: 0 }])
+    }
+
+    const fundResult = await distributeFund({
+      memberId,
       amount: parseFloat(amount),
       description,
       paymentMode,
     })
 
-    if (result.error) {
-      setError(result.error)
+    if (fundResult.error) {
+      setError(fundResult.error)
       setLoading(false)
       return
     }
@@ -78,6 +101,7 @@ export function FundDistributionForm() {
     setTimeout(() => {
       setSuccess(false)
       setSelectedMember("")
+      setOtherName("")
       setAmount("")
       setDescription("")
       setPaymentMode("CASH")
@@ -97,6 +121,8 @@ export function FundDistributionForm() {
     )
   }
 
+  const isOther = selectedMember === OTHER_VALUE
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
@@ -107,20 +133,43 @@ export function FundDistributionForm() {
 
       <div>
         <Label htmlFor="member">Select Member *</Label>
-        <select
-          id="member"
-          value={selectedMember}
-          onChange={(e) => setSelectedMember(e.target.value)}
-          className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-          required
-        >
-          <option value="">Select a member</option>
-          {members.map((member) => (
-            <option key={member.id} value={member.id}>
-              {member.name || member.email}
-            </option>
-          ))}
-        </select>
+        {isOther ? (
+          <Input
+            id="otherName"
+            type="text"
+            value={otherName}
+            onChange={(e) => setOtherName(e.target.value)}
+            placeholder="Enter member name"
+            required
+            className="mt-1"
+            autoFocus
+          />
+        ) : (
+          <select
+            id="member"
+            value={selectedMember}
+            onChange={(e) => { setSelectedMember(e.target.value); setOtherName("") }}
+            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+            required
+          >
+            <option value="">Select a member</option>
+            {members.map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.name || member.email}
+              </option>
+            ))}
+            <option value={OTHER_VALUE}>Other (New Member)</option>
+          </select>
+        )}
+        {isOther && (
+          <button
+            type="button"
+            onClick={() => { setSelectedMember(""); setOtherName("") }}
+            className="mt-1 text-xs text-blue-600 hover:text-blue-800"
+          >
+            Back to member list
+          </button>
+        )}
       </div>
 
       <div>

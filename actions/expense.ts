@@ -2,7 +2,7 @@
 
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { auth } from "@/lib/auth"
+import { auth, hashPassword } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 
 const optionalStringSchema = z.preprocess(
@@ -1019,4 +1019,46 @@ export async function getAllMembers() {
     },
     orderBy: { name: "asc" },
   })
+}
+
+const createMemberByNameSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+})
+
+export async function createMemberByName(data: z.infer<typeof createMemberByNameSchema>) {
+  const session = await auth()
+
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return { error: "Unauthorized" }
+  }
+
+  const result = createMemberByNameSchema.safeParse(data)
+  if (!result.success) {
+    return { error: result.error.issues[0].message }
+  }
+
+  const rawName = result.data.name.trim()
+  const suffix = Date.now()
+  const email = `${rawName.toLowerCase().replace(/\s+/g, ".")}.${suffix}@expense.com`
+  const password = await hashPassword("member@123")
+
+  const user = await prisma.user.create({
+    data: {
+      email,
+      name: rawName,
+      password,
+      role: "MEMBER",
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  })
+
+  revalidatePath("/admin")
+  revalidatePath("/admin/fund-distribution")
+  revalidatePath("/admin/dashboard")
+
+  return { success: true as const, id: user.id, name: user.name!, email: user.email }
 }
