@@ -580,7 +580,6 @@ export async function getExpenseStats() {
       where: {
         createdById: { not: session.user.id },
         description: { not: null },
-        createdBy: { role: "MEMBER" },
       },
       select: { id: true, amount: true, description: true },
     })

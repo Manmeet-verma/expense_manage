@@ -73,7 +73,7 @@ export default async function AdminStatementPage({
           where: { createdById: member.id, ...dateFilter },
         }),
         prisma.fund.findMany({
-          where: { userId: member.id, ...fundDateFilter },
+          where: { userId: member.id },
           select: {
             id: true,
             amount: true,
@@ -88,7 +88,6 @@ export default async function AdminStatementPage({
           where: {
             createdById: { not: member.id },
             description: { not: null },
-            ...dateFilter,
           },
           select: {
             id: true,
