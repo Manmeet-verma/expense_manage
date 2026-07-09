@@ -552,11 +552,19 @@ export async function getExpenseStats() {
     })
     totalCollectionAmount = adminCollection._sum.amount || 0
   } else {
-    const fundAgg = await prisma.fund.aggregate({
+    const funds = await prisma.fund.findMany({
       where: { userId: session.user.id },
-      _sum: { amount: true },
+      select: { id: true, amount: true, receivedFrom: true },
     })
-    totalCollectionAmount = fundAgg._sum.amount || 0
+    totalCollectionAmount = funds.reduce((sum, f) => sum + f.amount, 0)
+
+    const referencedExpenseIds = new Set<string>()
+    for (const fund of funds) {
+      const match = fund.receivedFrom?.match(/from expense\s+([^\s]+)$/i)
+      if (match?.[1]) {
+        referencedExpenseIds.add(match[1])
+      }
+    }
 
     const allMembers = await prisma.user.findMany({
       where: { role: "MEMBER" },
@@ -582,6 +590,7 @@ export async function getExpenseStats() {
     }
 
     for (const exp of otherExpenses) {
+      if (referencedExpenseIds.has(exp.id)) continue
       const sourceText = exp.description?.trim() || ""
       if (!sourceText) continue
       for (const link of memberLinks) {
