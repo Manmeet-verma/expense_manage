@@ -4,14 +4,6 @@ import { FundDistributionForm } from "@/components/admin-fund-distribution-form"
 import { AdminDistributionTransactionsTable } from "@/components/admin-distribution-transactions-table"
 import { getDistributedFundTransactions } from "@/actions/expense"
 
-function getTodayString(): string {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, "0")
-  const day = String(today.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-
 export default async function FundDistributionPage({
   searchParams,
 }: {
@@ -34,8 +26,8 @@ export default async function FundDistributionPage({
   }
 
   const resolvedSearchParams = (await searchParams) ?? {}
-  const fromDate = resolvedSearchParams.fromDate || getTodayString()
-  const toDate = resolvedSearchParams.toDate || getTodayString()
+  const fromDate = resolvedSearchParams.fromDate || ""
+  const toDate = resolvedSearchParams.toDate || ""
 
   const transactions = await getDistributedFundTransactions(fromDate, toDate)
 

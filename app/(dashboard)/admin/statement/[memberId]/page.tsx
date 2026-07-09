@@ -132,7 +132,7 @@ export default async function AdminMemberStatementPage({
   const [expenses, collectionExpenses, funds] = await Promise.all([
     prisma.expense.findMany({
       where: { createdById: member.id, ...dateFilter },
-      orderBy: [{ createdAt: "asc" }],
+      orderBy: [{ createdAt: "desc" }],
       select: {
         id: true,
         title: true,
@@ -148,7 +148,7 @@ export default async function AdminMemberStatementPage({
         description: { not: null },
         ...dateFilter,
       },
-      orderBy: [{ createdAt: "asc" }],
+      orderBy: [{ createdAt: "desc" }],
       select: {
         id: true,
         amount: true,
@@ -160,7 +160,7 @@ export default async function AdminMemberStatementPage({
     }),
     prisma.fund.findMany({
       where: { userId: member.id, ...fundDateFilter },
-      orderBy: [{ fundDate: "asc" }],
+      orderBy: [{ fundDate: "desc" }],
       select: {
         id: true,
         amount: true,
@@ -200,8 +200,8 @@ export default async function AdminMemberStatementPage({
       amount: 0,
     })),
   ].sort((left, right) => {
-    const diff = new Date(left.date).getTime() - new Date(right.date).getTime()
-    return diff !== 0 ? diff : left.id.localeCompare(right.id)
+    const diff = new Date(right.date).getTime() - new Date(left.date).getTime()
+    return diff !== 0 ? diff : right.id.localeCompare(left.id)
   })
 
   const categoryOptions = Array.from(new Set(rows.map((row) => row.category))).sort((a, b) => a.localeCompare(b))

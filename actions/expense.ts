@@ -1033,7 +1033,6 @@ export async function getDistributedFundTransactions(fromDate?: string, toDate?:
     orderBy: {
       createdAt: "desc",
     },
-    take: 100,
   })
   .then((transactions) =>
     transactions.map((transaction) => ({

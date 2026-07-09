@@ -113,7 +113,7 @@ export function buildStatementCollectionRows({
   }
 
   return rows.sort((left, right) => {
-    const diff = new Date(left.fundDate).getTime() - new Date(right.fundDate).getTime()
-    return diff !== 0 ? diff : left.id.localeCompare(right.id)
+    const diff = new Date(right.fundDate).getTime() - new Date(left.fundDate).getTime()
+    return diff !== 0 ? diff : right.id.localeCompare(left.id)
   })
 }
