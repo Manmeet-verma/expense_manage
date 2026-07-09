@@ -4,6 +4,7 @@ import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { auth, hashPassword } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
+import { findFirstMention } from "@/lib/statement"
 
 const optionalStringSchema = z.preprocess(
   (value) => (value === null || value === "" ? undefined : value),
@@ -581,23 +582,16 @@ export async function getExpenseStats() {
         createdById: { not: session.user.id },
         description: { not: null },
       },
-      select: { id: true, amount: true, description: true },
+      select: { id: true, amount: true, description: true, title: true },
     })
-
-    function escapeRegExp(value: string) {
-      return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    }
 
     for (const exp of otherExpenses) {
       if (referencedExpenseIds.has(exp.id)) continue
-      const sourceText = exp.description?.trim() || ""
+      const sourceText = exp.description?.trim() || exp.title.trim()
       if (!sourceText) continue
-      for (const link of memberLinks) {
-        const matcher = new RegExp(`\\b${escapeRegExp(link.label)}\\b`, "i")
-        if (link.id === session.user.id && matcher.test(sourceText)) {
-          totalCollectionAmount += exp.amount
-          break
-        }
+      const mention = findFirstMention(sourceText, memberLinks)
+      if (mention && mention.id === session.user.id) {
+        totalCollectionAmount += exp.amount
       }
     }
   }
