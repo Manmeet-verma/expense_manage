@@ -7,6 +7,7 @@ type MemberRow = {
   id: string
   name: string | null
   email: string
+  hasPassword: boolean
   receivedAmount: number
   totalEdits: number
   createdAt: Date

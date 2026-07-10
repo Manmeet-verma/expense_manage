@@ -418,6 +418,7 @@ export async function getMembers() {
       id: true,
       name: true,
       email: true,
+      password: true,
       receivedAmount: true,
       createdAt: true,
       expenses: {
@@ -525,6 +526,7 @@ export async function getMembers() {
       id: member.id,
       name: member.name,
       email: member.email,
+      hasPassword: !!member.password,
       receivedAmount: fundTotal + mentionTotal,
       createdAt: member.createdAt,
       _count: member._count,

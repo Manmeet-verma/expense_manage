@@ -16,6 +16,7 @@ interface MemberRow {
   id: string
   name: string | null
   email: string
+  hasPassword: boolean
   receivedAmount: number
   totalEdits: number
   createdAt: Date
@@ -523,6 +524,7 @@ export default function MembersContent({
                 <tr>
                   <th className="px-4 py-3 font-semibold">Name</th>
                   <th className="px-4 py-3 font-semibold">Email</th>
+                  <th className="px-4 py-3 font-semibold">Password</th>
                   <th className="px-4 py-3 font-semibold">Expenses</th>
                   <th className="px-4 py-3 font-semibold">Collection</th>
                   <th className="px-4 py-3 font-semibold">Advance</th>
@@ -535,7 +537,7 @@ export default function MembersContent({
               <tbody>
                 {members.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
+                    <td colSpan={10} className="px-4 py-10 text-center text-gray-500">
                       No members found
                     </td>
                   </tr>
@@ -551,6 +553,11 @@ export default function MembersContent({
                         </button>
                       </td>
                       <td className="px-4 py-3 text-gray-700">{member.email}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${member.hasPassword ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                          {member.hasPassword ? "Set" : "Not Set"}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-gray-700">{member._count.expenses}</td>
                       <td className="px-4 py-3 text-gray-700">{formatCurrency(member.receivedAmount)}</td>
                       <td className="px-4 py-3 text-orange-700">{formatCurrency(member.advanceTotal || 0)}</td>
@@ -592,6 +599,9 @@ export default function MembersContent({
                       {member.name || "-"}
                     </button>
                     <p className="text-sm text-gray-600">{member.email}</p>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${member.hasPassword ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                      Password: {member.hasPassword ? "Set" : "Not Set"}
+                    </span>
                   </div>
                   <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                     <div>
