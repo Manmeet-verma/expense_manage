@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { FundDistributionForm } from "@/components/admin-fund-distribution-form"
 import { AdminDistributionTransactionsTable } from "@/components/admin-distribution-transactions-table"
 import { AdminPendingDistributions } from "@/components/admin-pending-distributions"
-import { getDistributedFundTransactions, getPendingDistributions } from "@/actions/expense"
+import { getDistributedFundTransactions, getPendingDistributions, autoApproveOldFunds } from "@/actions/expense"
 
 export default async function FundDistributionPage({
   searchParams,
@@ -34,6 +34,8 @@ export default async function FundDistributionPage({
     getDistributedFundTransactions(fromDate, toDate),
     getPendingDistributions(),
   ])
+
+  await autoApproveOldFunds()
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">

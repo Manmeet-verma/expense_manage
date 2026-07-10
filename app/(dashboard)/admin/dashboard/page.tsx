@@ -5,9 +5,6 @@ import { getAdmins } from "@/actions/auth"
 import { getCategoryStatistics } from "@/actions/category"
 import { AdminSection } from "@/components/forms/admin-section"
 import { AdminCategoryUsageSection } from "@/components/admin-category-usage-section"
-import { AdminAdvanceSalaryApproval } from "@/components/admin-advance-salary-approval"
-import { AdminAutoApproveSection } from "@/components/admin-auto-approve-section"
-import { getPendingAdvanceSalary } from "@/actions/expense"
 import { buttonVariants } from "@/components/ui/button"
 
 function getTodayString(): string {
@@ -39,7 +36,6 @@ export default async function AdminDashboardPage({
 
   const admins = await getAdmins()
   const categories = await getCategoryStatistics(fromDate, toDate)
-  const pendingAdvanceSalary = await getPendingAdvanceSalary()
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -49,14 +45,6 @@ export default async function AdminDashboardPage({
       </div>
 
       <AdminSection admins={admins} currentAdminId={session.user.id} />
-
-      <div className="mt-10">
-        <AdminAutoApproveSection />
-      </div>
-
-      <div className="mt-6">
-        <AdminAdvanceSalaryApproval initialRequests={pendingAdvanceSalary} />
-      </div>
 
       <div className="mt-10">
         <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
