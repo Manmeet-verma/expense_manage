@@ -6,6 +6,7 @@ import { getCategoryStatistics } from "@/actions/category"
 import { AdminSection } from "@/components/forms/admin-section"
 import { AdminCategoryUsageSection } from "@/components/admin-category-usage-section"
 import { AdminAdvanceSalaryApproval } from "@/components/admin-advance-salary-approval"
+import { AdminAutoApproveSection } from "@/components/admin-auto-approve-section"
 import { getPendingAdvanceSalary } from "@/actions/expense"
 import { buttonVariants } from "@/components/ui/button"
 
@@ -50,6 +51,10 @@ export default async function AdminDashboardPage({
       <AdminSection admins={admins} currentAdminId={session.user.id} />
 
       <div className="mt-10">
+        <AdminAutoApproveSection />
+      </div>
+
+      <div className="mt-6">
         <AdminAdvanceSalaryApproval initialRequests={pendingAdvanceSalary} />
       </div>
 

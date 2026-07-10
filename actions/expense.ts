@@ -1400,6 +1400,54 @@ export async function getPendingDistributions() {
   }))
 }
 
+export async function autoApproveOldFunds() {
+  const session = await auth()
+
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return { error: "Unauthorized" }
+  }
+
+  const startOfThisMonth = new Date()
+  startOfThisMonth.setDate(1)
+  startOfThisMonth.setHours(0, 0, 0, 0)
+
+  const oldPendingFunds = await prisma.fund.findMany({
+    where: {
+      status: "PENDING",
+      createdAt: { lt: startOfThisMonth },
+    },
+  })
+
+  if (oldPendingFunds.length === 0) {
+    return { success: true, approved: 0 }
+  }
+
+  for (const fund of oldPendingFunds) {
+    await prisma.$transaction([
+      prisma.fund.update({
+        where: { id: fund.id },
+        data: {
+          status: "APPROVED",
+          approvedById: session.user.id,
+          approvedAt: new Date(),
+        },
+      }),
+      prisma.user.update({
+        where: { id: fund.userId },
+        data: { receivedAmount: { increment: fund.amount } },
+      }),
+    ])
+  }
+
+  revalidatePath("/dashboard/my-statement")
+  revalidatePath("/dashboard/statement")
+  revalidatePath("/admin/statement")
+  revalidatePath("/admin/members")
+  revalidatePath("/admin/fund-distribution")
+
+  return { success: true, approved: oldPendingFunds.length }
+}
+
 export async function getPendingAdvanceSalary() {
   const session = await auth()
 
