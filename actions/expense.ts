@@ -572,11 +572,11 @@ export async function getExpenseStats() {
     : { createdById: session.user.id }
 
   const [total, pending, approved, rejected, paid] = await Promise.all([
-    prisma.expense.count({ where }),
-    prisma.expense.count({ where: { ...where, status: "PENDING" } }),
-    prisma.expense.count({ where: { ...where, status: "APPROVED" } }),
-    prisma.expense.count({ where: { ...where, status: "REJECTED" } }),
-    prisma.expense.count({ where: { ...where, status: "PAID" } }),
+    prisma.expense.count({ where: { ...where, category: { notIn: ["Advance", "Salary"] } } }),
+    prisma.expense.count({ where: { ...where, status: "PENDING", category: { notIn: ["Advance", "Salary"] } } }),
+    prisma.expense.count({ where: { ...where, status: "APPROVED", category: { notIn: ["Advance", "Salary"] } } }),
+    prisma.expense.count({ where: { ...where, status: "REJECTED", category: { notIn: ["Advance", "Salary"] } } }),
+    prisma.expense.count({ where: { ...where, status: "PAID", category: { notIn: ["Advance", "Salary"] } } }),
   ])
 
   const [totalApprovedAmount, totalPaidAmount, totalPendingAmount, totalRejectedAmount] = await Promise.all([
@@ -651,9 +651,9 @@ export async function getExpenseStats() {
     }
   }
 
-  // Get submitted expenses total (PENDING + APPROVED + REJECTED)
+  // Get submitted expenses total (PENDING + APPROVED + REJECTED) - excluding Advance and Salary
   const submittedAmount = await prisma.expense.aggregate({
-    where,
+    where: { ...where, category: { notIn: ["Advance", "Salary"] } },
     _sum: { amount: true },
   })
 
@@ -1397,5 +1397,38 @@ export async function getPendingDistributions() {
     status: fund.status,
     memberName: fund.user.name || fund.user.email,
     memberId: fund.user.id,
+  }))
+}
+
+export async function getPendingAdvanceSalary() {
+  const session = await auth()
+
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return []
+  }
+
+  const expenses = await prisma.expense.findMany({
+    where: {
+      category: { in: ["Advance", "Salary"] },
+      status: "PENDING",
+    },
+    include: {
+      createdBy: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  })
+
+  return expenses.map((exp) => ({
+    id: exp.id,
+    title: exp.title,
+    description: exp.description,
+    amount: exp.amount,
+    category: exp.category,
+    status: exp.status,
+    createdAt: exp.createdAt,
+    memberName: exp.createdBy?.name || exp.createdBy?.email || "Unknown",
+    memberId: exp.createdBy?.id || "",
   }))
 }
