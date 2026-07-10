@@ -28,22 +28,25 @@ export async function GET(request: NextRequest) {
   const fromDate = searchParams.get("fromDate")
   const toDate = searchParams.get("toDate")
   const userId = searchParams.get("userId")
+  const statusFilter = searchParams.get("status")
   const targetUserId = userId || session.user.id
 
   try {
     const dateRange = parseDateRange(fromDate, toDate)
 
-    // Build where clauses with parsed dates
-    const fundsWhere = {
+    const fundsWhere: Record<string, unknown> = {
       userId: targetUserId,
-      ...(dateRange
-        ? {
-            fundDate: {
-              gte: dateRange.fromDateTime,
-              lte: dateRange.toDateTime,
-            },
-          }
-        : {}),
+    }
+
+    if (statusFilter) {
+      fundsWhere.status = statusFilter
+    }
+
+    if (dateRange) {
+      fundsWhere.fundDate = {
+        gte: dateRange.fromDateTime,
+        lte: dateRange.toDateTime,
+      }
     }
 
     const expensesWhere = {
@@ -59,7 +62,6 @@ export async function GET(request: NextRequest) {
         : {}),
     }
 
-    // Run database queries with a timeout to avoid Vercel runtime 300s hangs
     const [members, funds, collectionExpenses] = await Promise.all([
       withTimeout(
         prisma.user.findMany({
@@ -83,6 +85,11 @@ export async function GET(request: NextRequest) {
             receivedFrom: true,
             paymentMode: true,
             fundDate: true,
+            status: true,
+            rejectReason: true,
+            approvedAt: true,
+            createdAt: true,
+            userId: true,
           },
           take: 5000,
         }),
@@ -109,14 +116,32 @@ export async function GET(request: NextRequest) {
 
     const memberLinks = buildMemberLinks(members)
 
+    function extractMentionedBy(receivedFrom: string): string | null {
+      if (receivedFrom.startsWith("Admin Distribution:")) {
+        return "Admin"
+      }
+      const expenseMatch = receivedFrom.match(/^(.+?)\s*\|\s*from expense/)
+      if (expenseMatch) {
+        return expenseMatch[1].trim()
+      }
+      return receivedFrom || null
+    }
+
+    const fundsWithMentionedBy = funds.map((f) => ({
+      ...f,
+      mentionedBy: extractMentionedBy(f.receivedFrom),
+    }))
+
+    const approvedFunds = fundsWithMentionedBy.filter((f) => f.status === "APPROVED")
+
     const collectionRows = buildStatementCollectionRows({
       memberId: targetUserId,
       memberLinks,
-      funds,
+      funds: approvedFunds,
       expenses: collectionExpenses,
     })
 
-    return NextResponse.json(collectionRows)
+    return NextResponse.json({ funds: fundsWithMentionedBy, collectionRows })
   } catch (error) {
     console.error("Failed to fetch funds:", error)
     return NextResponse.json({ error: "Failed to fetch funds" }, { status: 500 })

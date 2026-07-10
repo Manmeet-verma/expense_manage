@@ -6,8 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatDate, parseJsonSafe } from "@/lib/utils"
-import { Search, CheckCircle, XCircle, Clock, DollarSign, List, Edit, Trash2 } from "lucide-react"
-import { updateExpense, deleteExpense, updateFund, deleteFund } from "@/actions/expense"
+import { Search, CheckCircle, XCircle, Clock, DollarSign, List, Edit, Trash2, Ban } from "lucide-react"
+import { updateExpense, deleteExpense, updateFund, deleteFund, approveFund, rejectFund } from "@/actions/expense"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
@@ -30,9 +30,13 @@ interface Fund {
   paymentMode: string
   fundDate: Date
   createdAt: Date
+  status: "PENDING" | "APPROVED" | "REJECTED"
+  rejectReason?: string | null
+  userId: string
+  mentionedBy?: string | null
 }
 
-type TabType = "all" | "approved" | "rejected" | "pending" | "collection" | "advance" | "salary"
+type TabType = "all" | "approved" | "rejected" | "pending" | "collection" | "pending-collection" | "advance" | "salary"
 
 const CATEGORIES = [
   { value: "FREIGHT", label: "Freight/Gaddi" },
@@ -79,6 +83,7 @@ export function StatementClient({ userId }: { userId: string }) {
   const [rejectedExpenses, setRejectedExpenses] = useState<Expense[]>([])
   const [pendingExpenses, setPendingExpenses] = useState<Expense[]>([])
   const [collectionFunds, setCollectionFunds] = useState<Fund[]>([])
+  const [pendingFunds, setPendingFunds] = useState<Fund[]>([])
   const [activeTab, setActiveTab] = useState<TabType>("collection")
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
@@ -121,17 +126,22 @@ export function StatementClient({ userId }: { userId: string }) {
         fetch(`/api/funds/statement?${params.toString()}`),
       ])
 
-      const [approvedData, rejectedData, pendingData, collectionData] = await Promise.all([
+      const [approvedData, rejectedData, pendingData, collectionResData] = await Promise.all([
         parseJsonSafe(approvedRes),
         parseJsonSafe(rejectedRes),
         parseJsonSafe(pendingRes),
         parseJsonSafe(collectionRes),
       ])
 
+      const allFunds: Fund[] = collectionResData?.funds || []
+      const approvedCollectionFunds = allFunds.filter((f: Fund) => f.status === "APPROVED")
+      const pendingCollectionFunds = allFunds.filter((f: Fund) => f.status === "PENDING")
+
       setApprovedExpenses(approvedData || [])
       setRejectedExpenses(rejectedData || [])
       setPendingExpenses(pendingData || [])
-      setCollectionFunds(collectionData || [])
+      setCollectionFunds(approvedCollectionFunds || [])
+      setPendingFunds(pendingCollectionFunds || [])
       setActiveTab("collection")
     } catch (error) {
       console.error("Failed to fetch data:", error)
@@ -207,6 +217,41 @@ export function StatementClient({ userId }: { userId: string }) {
 
     setFundActionLoading(false)
     setPendingActionSuccess("Collection deleted successfully")
+    await handleSearch()
+    router.refresh()
+    setTimeout(() => setPendingActionSuccess(""), 2500)
+  }
+
+  async function handleFundApprove(fundId: string) {
+    setFundActionLoading(true)
+    const result = await approveFund(fundId)
+    if (result?.error) {
+      setPendingActionError(result.error)
+      setFundActionLoading(false)
+      return
+    }
+
+    setFundActionLoading(false)
+    setPendingActionSuccess("Collection approved successfully")
+    await handleSearch()
+    router.refresh()
+    setTimeout(() => setPendingActionSuccess(""), 2500)
+  }
+
+  async function handleFundReject(fundId: string) {
+    const reason = window.prompt("Enter rejection reason:")
+    if (!reason?.trim()) return
+
+    setFundActionLoading(true)
+    const result = await rejectFund(fundId, reason.trim())
+    if (result?.error) {
+      setPendingActionError(result.error)
+      setFundActionLoading(false)
+      return
+    }
+
+    setFundActionLoading(false)
+    setPendingActionSuccess("Collection rejected")
     await handleSearch()
     router.refresh()
     setTimeout(() => setPendingActionSuccess(""), 2500)
@@ -301,6 +346,8 @@ export function StatementClient({ userId }: { userId: string }) {
         return { data: filteredExpenses(pendingExpenses), total: pendingExpenses.reduce((sum, e) => sum + e.amount, 0) }
       case "collection":
         return { data: filteredFunds(collectionFunds), total: collectionFunds.reduce((sum, f) => sum + f.amount, 0), isCollection: true }
+      case "pending-collection":
+        return { data: filteredFunds(pendingFunds), total: pendingFunds.reduce((sum, f) => sum + f.amount, 0), isCollection: true, isPendingCollection: true }
       case "advance":
         return { data: filteredExpenses(advanceExpenses), total: advanceExpenses.reduce((sum, e) => sum + e.amount, 0) }
       case "salary":
@@ -311,7 +358,7 @@ export function StatementClient({ userId }: { userId: string }) {
     }
   }
 
-  const { data: currentData, total: currentTotal, isCollection } = getCurrentData()
+  const { data: currentData, total: currentTotal, isCollection, isPendingCollection } = getCurrentData()
 
   const statusColors = {
     all: "bg-blue-100 text-blue-700 border-blue-300",
@@ -319,6 +366,7 @@ export function StatementClient({ userId }: { userId: string }) {
     rejected: "bg-red-100 text-red-700 border-red-300",
     pending: "bg-yellow-100 text-yellow-700 border-yellow-300",
     collection: "bg-purple-100 text-purple-700 border-purple-300",
+    "pending-collection": "bg-orange-100 text-orange-700 border-orange-300",
     advance: "bg-orange-100 text-orange-700 border-orange-300",
     salary: "bg-purple-100 text-purple-700 border-purple-300",
   }
@@ -329,6 +377,7 @@ export function StatementClient({ userId }: { userId: string }) {
     rejected: "text-red-600",
     pending: "text-yellow-600",
     collection: "text-purple-600",
+    "pending-collection": "text-orange-600",
     advance: "text-orange-600",
     salary: "text-purple-600",
   }
@@ -405,6 +454,15 @@ export function StatementClient({ userId }: { userId: string }) {
               Collection ({collectionFunds.length})
             </button>
             <button
+              onClick={() => setActiveTab("pending-collection")}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition border ${
+                activeTab === "pending-collection" ? statusColors["pending-collection"] : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              Pending Collections ({pendingFunds.length})
+            </button>
+            <button
               onClick={() => setActiveTab("all")}
               className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition border ${
                 activeTab === "all" ? statusColors.all : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -479,8 +537,10 @@ export function StatementClient({ userId }: { userId: string }) {
                       <tr>
                         <th className="px-2 py-1.5 font-medium text-gray-600">Date</th>
                         <th className="px-2 py-1.5 font-medium text-gray-600">Received From</th>
+                        <th className="px-2 py-1.5 font-medium text-gray-600">Mentioned By</th>
                         <th className="px-2 py-1.5 font-medium text-gray-600">Mode</th>
                         <th className="px-2 py-1.5 font-medium text-gray-600 text-right">Amount</th>
+                        {isPendingCollection && <th className="px-2 py-1.5 font-medium text-gray-600">Status</th>}
                         <th className="px-2 py-1.5 font-medium text-gray-600 text-right">Actions</th>
                       </tr>
                     </thead>
@@ -489,34 +549,71 @@ export function StatementClient({ userId }: { userId: string }) {
                         <tr key={fund.id} className="hover:bg-gray-50">
                           <td className="px-2 py-1.5 text-gray-700">{formatDate(fund.fundDate)}</td>
                           <td className="px-2 py-1.5 text-gray-700 truncate max-w-32">{fund.receivedFrom}</td>
+                          <td className="px-2 py-1.5 text-gray-700 truncate max-w-24">{fund.mentionedBy || "-"}</td>
                           <td className="px-2 py-1.5 text-gray-700">
                             <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
                               {fund.paymentMode}
                             </span>
                           </td>
                           <td className="px-2 py-1.5 font-medium text-gray-900 text-right">{formatCurrency(fund.amount)}</td>
+                          {isPendingCollection && (
+                            <td className="px-2 py-1.5">
+                              <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
+                                Pending
+                              </span>
+                              {fund.rejectReason && (
+                                <span className="block text-xs text-red-500 mt-0.5">{fund.rejectReason}</span>
+                              )}
+                            </td>
+                          )}
                           <td className="px-2 py-1.5 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-6 px-1.5"
-                                onClick={() => openFundEditModal(fund)}
-                                disabled={fundActionLoading}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="destructive"
-                                className="h-6 px-1.5"
-                                onClick={() => void handleFundDelete(fund.id)}
-                                disabled={fundActionLoading}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                              {isPendingCollection ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-6 px-1.5 bg-green-600 hover:bg-green-700 text-white"
+                                    onClick={() => void handleFundApprove(fund.id)}
+                                    disabled={fundActionLoading}
+                                  >
+                                    <CheckCircle className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    className="h-6 px-1.5"
+                                    onClick={() => void handleFundReject(fund.id)}
+                                    disabled={fundActionLoading}
+                                  >
+                                    <Ban className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 px-1.5"
+                                    onClick={() => openFundEditModal(fund)}
+                                    disabled={fundActionLoading}
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    className="h-6 px-1.5"
+                                    onClick={() => void handleFundDelete(fund.id)}
+                                    disabled={fundActionLoading}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>

@@ -6,8 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatDate, parseJsonSafe } from "@/lib/utils"
-import { Search, CheckCircle, XCircle, Clock, Plus, Wallet, Edit, Trash2 } from "lucide-react"
-import { createFund, updateExpense, deleteExpense } from "@/actions/expense"
+import { Search, CheckCircle, XCircle, Clock, Plus, Wallet, Edit, Trash2, Ban } from "lucide-react"
+import { createFund, updateExpense, deleteExpense, approveFund, rejectFund } from "@/actions/expense"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
@@ -21,6 +21,18 @@ interface Expense {
   category: string
   status: "APPROVED" | "REJECTED" | "PENDING" | "PAID"
   createdAt: Date
+}
+
+interface Fund {
+  id: string
+  amount: number
+  receivedFrom: string
+  paymentMode: string
+  fundDate: Date
+  createdAt: Date
+  status: "PENDING" | "APPROVED" | "REJECTED"
+  rejectReason?: string | null
+  userId: string
 }
 
 const CATEGORIES = [
@@ -212,7 +224,8 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
   const [approvedExpenses, setApprovedExpenses] = useState<Expense[]>([])
   const [rejectedExpenses, setRejectedExpenses] = useState<Expense[]>([])
   const [pendingExpenses, setPendingExpenses] = useState<Expense[]>([])
-  const [activeTab, setActiveTab] = useState<"approved" | "rejected" | "pending">("approved")
+  const [pendingFunds, setPendingFunds] = useState<Fund[]>([])
+  const [activeTab, setActiveTab] = useState<"approved" | "rejected" | "pending" | "pending-collection">("approved")
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [showFundModal, setShowFundModal] = useState(false)
@@ -220,6 +233,7 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
   const [pendingActionLoading, setPendingActionLoading] = useState(false)
   const [pendingActionError, setPendingActionError] = useState("")
   const [pendingActionSuccess, setPendingActionSuccess] = useState("")
+  const [fundActionLoading, setFundActionLoading] = useState(false)
   const [editForm, setEditForm] = useState({
     title: "",
     description: "",
@@ -240,19 +254,25 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
         userId,
       })
 
-      const [approvedRes, rejectedRes, pendingRes] = await Promise.all([
+      const [approvedRes, rejectedRes, pendingRes, fundsRes] = await Promise.all([
         fetch(`/api/expenses/statement?${params.toString()}&status=APPROVED`),
         fetch(`/api/expenses/statement?${params.toString()}&status=REJECTED`),
         fetch(`/api/expenses/statement?${params.toString()}&status=PENDING`),
+        fetch(`/api/funds/statement?${params.toString()}`),
       ])
 
       const approvedData = await parseJsonSafe(approvedRes)
       const rejectedData = await parseJsonSafe(rejectedRes)
       const pendingData = await parseJsonSafe(pendingRes)
+      const fundsResData = await parseJsonSafe(fundsRes)
+
+      const allFunds: Fund[] = fundsResData?.funds || []
+      const pendingCollectionFunds = allFunds.filter((f: Fund) => f.status === "PENDING")
 
       setApprovedExpenses(approvedData)
       setRejectedExpenses(rejectedData)
       setPendingExpenses(pendingData)
+      setPendingFunds(pendingCollectionFunds)
     } catch (error) {
       console.error("Failed to fetch expenses:", error)
     }
@@ -328,11 +348,47 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
     setTimeout(() => setPendingActionSuccess(""), 2500)
   }
 
+  async function handleFundApprove(fundId: string) {
+    setFundActionLoading(true)
+    const result = await approveFund(fundId)
+    if (result?.error) {
+      setPendingActionError(result.error)
+      setFundActionLoading(false)
+      return
+    }
+
+    setFundActionLoading(false)
+    setPendingActionSuccess("Collection approved successfully")
+    await handleSearch()
+    router.refresh()
+    setTimeout(() => setPendingActionSuccess(""), 2500)
+  }
+
+  async function handleFundReject(fundId: string) {
+    const reason = window.prompt("Enter rejection reason:")
+    if (!reason?.trim()) return
+
+    setFundActionLoading(true)
+    const result = await rejectFund(fundId, reason.trim())
+    if (result?.error) {
+      setPendingActionError(result.error)
+      setFundActionLoading(false)
+      return
+    }
+
+    setFundActionLoading(false)
+    setPendingActionSuccess("Collection rejected")
+    await handleSearch()
+    router.refresh()
+    setTimeout(() => setPendingActionSuccess(""), 2500)
+  }
+
   const approvedTotal = approvedExpenses.reduce((sum, exp) => sum + exp.amount, 0)
   const rejectedTotal = rejectedExpenses.reduce((sum, exp) => sum + exp.amount, 0)
   const pendingTotal = pendingExpenses.reduce((sum, exp) => sum + exp.amount, 0)
-  const currentExpenses = activeTab === "approved" ? approvedExpenses : activeTab === "rejected" ? rejectedExpenses : pendingExpenses
-  const currentTotal = activeTab === "approved" ? approvedTotal : activeTab === "rejected" ? rejectedTotal : pendingTotal
+  const pendingCollectionTotal = pendingFunds.reduce((sum, f) => sum + f.amount, 0)
+  const currentExpenses = activeTab === "approved" ? approvedExpenses : activeTab === "rejected" ? rejectedExpenses : activeTab === "pending" ? pendingExpenses : []
+  const currentTotal = activeTab === "approved" ? approvedTotal : activeTab === "rejected" ? rejectedTotal : activeTab === "pending" ? pendingTotal : pendingCollectionTotal
 
   const statusColors = {
     approved: "bg-green-100 text-green-700 border-green-300",
@@ -418,6 +474,15 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
               <Clock className="w-3 h-3" />
               Pending ({pendingExpenses.length})
             </button>
+            <button
+              onClick={() => setActiveTab("pending-collection")}
+              className={`flex items-center gap-1 px-3 py-1 text-xs rounded font-medium transition border ${
+                activeTab === "pending-collection" ? "bg-orange-100 text-orange-700 border-orange-300" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <Wallet className="w-3 h-3" />
+              Pending Collections ({pendingFunds.length})
+            </button>
             <div className="ml-auto flex items-center gap-2">
               <span className="text-xs text-gray-500">Total:</span>
               <span className={`text-sm font-bold ${totalColor}`}>
@@ -428,7 +493,73 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
 
           <Card className="bg-white">
             <CardContent className="p-0">
-              {currentExpenses.length === 0 ? (
+              {activeTab === "pending-collection" ? (
+                pendingFunds.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-gray-500">
+                    No pending collections found
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 text-left">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold text-gray-600">Date</th>
+                          <th className="px-3 py-2 font-semibold text-gray-600">Received From</th>
+                          <th className="px-3 py-2 font-semibold text-gray-600">Mode</th>
+                          <th className="px-3 py-2 font-semibold text-gray-600 text-right">Amount</th>
+                          <th className="px-3 py-2 font-semibold text-gray-600">Status</th>
+                          <th className="px-3 py-2 font-semibold text-gray-600 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {pendingFunds.map((fund) => (
+                          <tr key={fund.id} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 text-gray-700">{formatDate(fund.fundDate)}</td>
+                            <td className="px-3 py-2 text-gray-700 truncate max-w-32">{fund.receivedFrom}</td>
+                            <td className="px-3 py-2 text-gray-700">
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                                {fund.paymentMode}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 font-semibold text-gray-900 text-right">{formatCurrency(fund.amount)}</td>
+                            <td className="px-3 py-2">
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
+                                Pending
+                              </span>
+                              {fund.rejectReason && (
+                                <span className="block text-xs text-red-500 mt-0.5">{fund.rejectReason}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-7 px-2 bg-green-600 hover:bg-green-700 text-white"
+                                  onClick={() => void handleFundApprove(fund.id)}
+                                  disabled={fundActionLoading}
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 px-2"
+                                  onClick={() => void handleFundReject(fund.id)}
+                                  disabled={fundActionLoading}
+                                >
+                                  <Ban className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : currentExpenses.length === 0 ? (
                 <div className="text-center py-6 text-xs text-gray-500">
                   No {activeTab === "approved" ? "approved" : activeTab === "rejected" ? "rejected" : "pending"} expenses found
                 </div>

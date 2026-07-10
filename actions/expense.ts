@@ -516,16 +516,12 @@ export async function markExpensePaid(data: z.infer<typeof paymentSchema>) {
 
     const receivedFrom = `${payer?.name || payer?.email || "Unknown"} | from expense ${expense.id}`
 
-    await tx.user.update({
-      where: { id: mentionedMemberId },
-      data: { receivedAmount: { increment: expense.amount } },
-    })
-
     await tx.fund.create({
       data: {
         amount: expense.amount,
         receivedFrom,
         paymentMode: "CASH",
+        status: "PENDING",
         fundDate: new Date(),
         userId: mentionedMemberId,
       },
@@ -533,6 +529,18 @@ export async function markExpensePaid(data: z.infer<typeof paymentSchema>) {
   })
 
   if (mentionedMemberId) {
+    const mentionedUser = await prisma.user.findUnique({
+      where: { id: mentionedMemberId },
+      select: { name: true, email: true },
+    })
+
+    await createNotification({
+      title: "Collection Pending Approval",
+      message: `Expense transfer of ₹${expense.amount.toLocaleString("en-IN")} from ${expense.createdById} - awaiting your approval`,
+      type: "FUND_RECEIVED",
+      userId: mentionedMemberId,
+    })
+
     revalidatePath(`/dashboard/my-statement`)
     revalidatePath(`/dashboard/statement`)
   }
@@ -598,7 +606,7 @@ export async function getExpenseStats() {
     totalCollectionAmount = adminCollection._sum.amount || 0
   } else {
     const funds = await prisma.fund.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, status: "APPROVED" },
       select: { id: true, amount: true, receivedFrom: true },
     })
     totalCollectionAmount = funds.reduce((sum, f) => sum + f.amount, 0)
@@ -797,6 +805,7 @@ export async function createFund(data: z.infer<typeof fundSchema>) {
       amount,
       receivedFrom,
       paymentMode,
+      status: "PENDING",
       upiId: paymentMode === "GPAY" ? upiId || null : null,
       accountNumber: paymentMode === "BANK_ACCOUNT" ? accountNumber || null : null,
       fundDate: fundDate ? new Date(fundDate) : new Date(),
@@ -807,8 +816,8 @@ export async function createFund(data: z.infer<typeof fundSchema>) {
   const memberName = session.user.name || session.user.email
 
   await createNotificationsForAllUsers({
-    title: "Collection Deposited",
-    message: `${memberName} deposited ₹${amount.toLocaleString("en-IN")} via ${paymentMode.replace("_", " ").toLowerCase()}`,
+    title: "Collection Pending Approval",
+    message: `${memberName} deposited ₹${amount.toLocaleString("en-IN")} via ${paymentMode.replace("_", " ").toLowerCase()} - awaiting approval`,
     type: "FUND_RECEIVED",
     excludeUserId: session.user.id,
   })
@@ -895,6 +904,97 @@ export async function deleteFund(id: string) {
   return { success: true }
 }
 
+export async function approveFund(id: string) {
+  const session = await auth()
+
+  if (!session?.user) {
+    return { error: "Unauthorized" }
+  }
+
+  const fund = await prisma.fund.findUnique({ where: { id } })
+  if (!fund) return { error: "Fund not found" }
+
+  if (fund.userId !== session.user.id && session.user.role !== "ADMIN") {
+    return { error: "You can only approve your own funds" }
+  }
+
+  if (fund.status !== "PENDING") {
+    return { error: "Only pending funds can be approved" }
+  }
+
+  await prisma.$transaction([
+    prisma.fund.update({
+      where: { id },
+      data: {
+        status: "APPROVED",
+        approvedById: session.user.id,
+        approvedAt: new Date(),
+      },
+    }),
+    prisma.user.update({
+      where: { id: fund.userId },
+      data: { receivedAmount: { increment: fund.amount } },
+    }),
+  ])
+
+  await createNotification({
+    title: "Fund Approved",
+    message: `Your fund of ₹${fund.amount.toFixed(2)} has been approved by ${session.user.name || "Admin"}.`,
+    type: "fund-approved",
+    userId: fund.userId,
+  })
+
+  revalidatePath("/dashboard/my-statement")
+  revalidatePath("/dashboard/statement")
+  revalidatePath("/admin/statement")
+  revalidatePath("/admin/members")
+  return { success: true }
+}
+
+export async function rejectFund(id: string, reason: string) {
+  const session = await auth()
+
+  if (!session?.user) {
+    return { error: "Unauthorized" }
+  }
+
+  const fund = await prisma.fund.findUnique({ where: { id } })
+  if (!fund) return { error: "Fund not found" }
+
+  if (fund.userId !== session.user.id && session.user.role !== "ADMIN") {
+    return { error: "You can only reject your own funds" }
+  }
+
+  if (fund.status !== "PENDING") {
+    return { error: "Only pending funds can be rejected" }
+  }
+
+  if (!reason?.trim()) {
+    return { error: "Rejection reason is required" }
+  }
+
+  await prisma.fund.update({
+    where: { id },
+    data: {
+      status: "REJECTED",
+      rejectReason: reason.trim(),
+    },
+  })
+
+  await createNotification({
+    title: "Fund Rejected",
+    message: `Your fund of ₹${fund.amount.toFixed(2)} has been rejected. Reason: ${reason.trim()}`,
+    type: "fund-rejected",
+    userId: fund.userId,
+  })
+
+  revalidatePath("/dashboard/my-statement")
+  revalidatePath("/dashboard/statement")
+  revalidatePath("/admin/statement")
+  revalidatePath("/admin/members")
+  return { success: true }
+}
+
 const distributeFundSchema = z.object({
   memberId: z.string().min(1, "Member ID is required"),
   amount: z.number().positive("Amount must be positive"),
@@ -975,25 +1075,16 @@ export async function distributeFund(data: z.infer<typeof distributeFundSchema>)
   const source = `${ADMIN_DISTRIBUTION_PREFIX}: ${distributedBy}`
   const receivedFrom = buildDistributionReceivedFrom(source, description)
 
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: memberId },
-      data: {
-        receivedAmount: {
-          increment: amount,
-        },
-      },
-    }),
-    prisma.fund.create({
-      data: {
-        amount,
-        receivedFrom,
-        paymentMode,
-        fundDate: new Date(),
-        userId: memberId,
-      },
-    }),
-  ])
+  await prisma.fund.create({
+    data: {
+      amount,
+      receivedFrom,
+      paymentMode,
+      status: "PENDING",
+      fundDate: new Date(),
+      userId: memberId,
+    },
+  })
 
   const memberDetails = await prisma.user.findUnique({
     where: { id: memberId },
@@ -1002,8 +1093,8 @@ export async function distributeFund(data: z.infer<typeof distributeFundSchema>)
   const memberName = memberDetails?.name || memberDetails?.email || "Member"
 
   await createNotification({
-    title: "Fund Received",
-    message: `${distributedBy} distributed ₹${amount.toLocaleString("en-IN")}${description ? ` for ${description}` : ""} to ${memberName}`,
+    title: "Fund Pending Approval",
+    message: `${distributedBy} sent ₹${amount.toLocaleString("en-IN")}${description ? ` for ${description}` : ""} to ${memberName} - awaiting approval`,
     type: "FUND_RECEIVED",
     userId: memberId,
   })

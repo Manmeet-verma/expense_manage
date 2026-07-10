@@ -82,6 +82,8 @@ export default async function AdminStatementPage({
             fundDate: true,
             createdAt: true,
             userId: true,
+            status: true,
+            rejectReason: true,
           },
         }),
         prisma.expense.findMany({
@@ -109,10 +111,11 @@ export default async function AdminStatementPage({
         }),
       ])
 
+      const approvedFunds = funds.filter((f) => f.status === "APPROVED")
       const collectionRows = buildStatementCollectionRows({
         memberId: member.id,
         memberLinks,
-        funds,
+        funds: approvedFunds,
         expenses: collectionExpenses,
       })
 

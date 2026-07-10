@@ -63,11 +63,21 @@ enum PaymentMode {
   BANK_ACCOUNT
 }
 
+enum FundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Fund {
   id            String      @id @default(cuid())
   amount        Float
   receivedFrom  String
   paymentMode   PaymentMode
+  status        FundStatus  @default(PENDING)
+  rejectReason  String?
+  approvedById  String?
+  approvedAt    DateTime?
   upiId         String?
   accountNumber String?
   fundDate      DateTime    @default(now())
@@ -79,6 +89,7 @@ model Fund {
   @@index([userId])
   @@index([fundDate])
   @@index([userId, fundDate])
+  @@index([status])
 }
 
 model Category {

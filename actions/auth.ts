@@ -440,7 +440,7 @@ export async function getMembers() {
     .sort((a, b) => b.label.length - a.label.length)
 
   const allFunds = await prisma.fund.findMany({
-    where: { userId: { in: members.map((m) => m.id) } },
+    where: { userId: { in: members.map((m) => m.id) }, status: "APPROVED" },
     select: { id: true, amount: true, receivedFrom: true, userId: true },
   })
 
