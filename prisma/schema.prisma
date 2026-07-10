@@ -78,6 +78,7 @@ model Fund {
   rejectReason  String?
   approvedById  String?
   approvedAt    DateTime?
+  createdById   String?
   upiId         String?
   accountNumber String?
   fundDate      DateTime    @default(now())
@@ -90,6 +91,7 @@ model Fund {
   @@index([fundDate])
   @@index([userId, fundDate])
   @@index([status])
+  @@index([createdById])
 }
 
 model Category {

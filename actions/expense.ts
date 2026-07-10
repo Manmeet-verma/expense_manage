@@ -522,6 +522,7 @@ export async function markExpensePaid(data: z.infer<typeof paymentSchema>) {
         receivedFrom,
         paymentMode: "CASH",
         status: "PENDING",
+        createdById: session.user.id,
         fundDate: new Date(),
         userId: mentionedMemberId,
       },
@@ -944,10 +945,22 @@ export async function approveFund(id: string) {
     userId: fund.userId,
   })
 
+  if (fund.createdById && fund.createdById !== session.user.id) {
+    const approverName = session.user.name || "Member"
+    const memberDetails = await prisma.user.findUnique({ where: { id: fund.userId }, select: { name: true } })
+    await createNotification({
+      title: "Distribution Approved",
+      message: `${memberDetails?.name || "Member"} approved your distribution of ₹${fund.amount.toFixed(2)}.`,
+      type: "distribution-approved",
+      userId: fund.createdById,
+    })
+  }
+
   revalidatePath("/dashboard/my-statement")
   revalidatePath("/dashboard/statement")
   revalidatePath("/admin/statement")
   revalidatePath("/admin/members")
+  revalidatePath("/admin/fund-distribution")
   return { success: true }
 }
 
@@ -988,10 +1001,21 @@ export async function rejectFund(id: string, reason: string) {
     userId: fund.userId,
   })
 
+  if (fund.createdById && fund.createdById !== session.user.id) {
+    const memberDetails = await prisma.user.findUnique({ where: { id: fund.userId }, select: { name: true } })
+    await createNotification({
+      title: "Distribution Rejected",
+      message: `${memberDetails?.name || "Member"} rejected your distribution of ₹${fund.amount.toFixed(2)}. Reason: ${reason.trim()}`,
+      type: "distribution-rejected",
+      userId: fund.createdById,
+    })
+  }
+
   revalidatePath("/dashboard/my-statement")
   revalidatePath("/dashboard/statement")
   revalidatePath("/admin/statement")
   revalidatePath("/admin/members")
+  revalidatePath("/admin/fund-distribution")
   return { success: true }
 }
 
@@ -1081,6 +1105,7 @@ export async function distributeFund(data: z.infer<typeof distributeFundSchema>)
       receivedFrom,
       paymentMode,
       status: "PENDING",
+      createdById: session.user.id,
       fundDate: new Date(),
       userId: memberId,
     },
@@ -1341,4 +1366,36 @@ export async function createMemberByName(data: z.infer<typeof createMemberByName
   revalidatePath("/admin/dashboard")
 
   return { success: true as const, id: user.id, name: user.name!, email: user.email }
+}
+
+export async function getPendingDistributions() {
+  const session = await auth()
+
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return []
+  }
+
+  const funds = await prisma.fund.findMany({
+    where: {
+      createdById: session.user.id,
+      status: "PENDING",
+    },
+    include: {
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  })
+
+  return funds.map((fund) => ({
+    id: fund.id,
+    amount: fund.amount,
+    receivedFrom: fund.receivedFrom,
+    paymentMode: fund.paymentMode,
+    fundDate: fund.fundDate,
+    status: fund.status,
+    memberName: fund.user.name || fund.user.email,
+    memberId: fund.user.id,
+  }))
 }

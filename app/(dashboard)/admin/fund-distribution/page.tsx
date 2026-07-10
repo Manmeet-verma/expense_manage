@@ -2,7 +2,8 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { FundDistributionForm } from "@/components/admin-fund-distribution-form"
 import { AdminDistributionTransactionsTable } from "@/components/admin-distribution-transactions-table"
-import { getDistributedFundTransactions } from "@/actions/expense"
+import { AdminPendingDistributions } from "@/components/admin-pending-distributions"
+import { getDistributedFundTransactions, getPendingDistributions } from "@/actions/expense"
 
 export default async function FundDistributionPage({
   searchParams,
@@ -29,7 +30,10 @@ export default async function FundDistributionPage({
   const fromDate = resolvedSearchParams.fromDate || ""
   const toDate = resolvedSearchParams.toDate || ""
 
-  const transactions = await getDistributedFundTransactions(fromDate, toDate)
+  const [transactions, pendingFunds] = await Promise.all([
+    getDistributedFundTransactions(fromDate, toDate),
+    getPendingDistributions(),
+  ])
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
@@ -39,6 +43,8 @@ export default async function FundDistributionPage({
       </div>
 
       <div className="space-y-4">
+        <AdminPendingDistributions initialFunds={pendingFunds} />
+
         <div className="mx-auto w-full max-w-3xl rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
           <FundDistributionForm />
         </div>
