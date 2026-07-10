@@ -146,7 +146,9 @@ export function Navigation({ user }: NavProps) {
             </div>
 
             <div className="flex items-center gap-3">
-              <NotificationBell />
+              <div className="hidden md:block">
+                <NotificationBell />
+              </div>
               <div className="hidden md:flex items-center gap-3 whitespace-nowrap">
                 <span className="text-sm font-medium text-gray-900">{user.role}: {user.name || user.email}</span>
                 <Button

@@ -93,3 +93,46 @@ export async function markAllNotificationsAsRead() {
   revalidatePath("/")
   return { success: true }
 }
+
+export async function backfillPendingExpenseNotifications() {
+  const session = await auth()
+  if (!session?.user) return { error: "Unauthorized" }
+
+  if (session.user.role !== "ADMIN" && session.user.role !== "SUPERVISOR") {
+    return { error: "Unauthorized" }
+  }
+
+  const existingCount = await prisma.notification.count({
+    where: { userId: session.user.id },
+  })
+
+  if (existingCount > 0) return { success: true, created: 0 }
+
+  const pendingExpenses = await prisma.expense.findMany({
+    where: { status: "PENDING" },
+    select: {
+      id: true,
+      amount: true,
+      category: true,
+      createdAt: true,
+      createdBy: {
+        select: { name: true, email: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  })
+
+  if (pendingExpenses.length === 0) return { success: true, created: 0 }
+
+  const notifications = pendingExpenses.map((expense) => ({
+    title: "New Expense Added",
+    message: `${expense.createdBy.name || expense.createdBy.email} added a ${expense.category} expense of ₹${expense.amount.toLocaleString("en-IN")}`,
+    type: "EXPENSE_CREATED",
+    userId: session.user.id,
+  }))
+
+  await prisma.notification.createMany({ data: notifications })
+
+  revalidatePath("/")
+  return { success: true, created: notifications.length }
+}

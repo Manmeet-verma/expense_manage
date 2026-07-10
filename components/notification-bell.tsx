@@ -9,6 +9,7 @@ import {
   getUnreadNotificationCount,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  backfillPendingExpenseNotifications,
 } from "@/actions/notification"
 
 interface NotificationItem {
@@ -80,8 +81,22 @@ export function NotificationBell() {
         getMyNotifications(),
         getUnreadNotificationCount(),
       ])
-      setNotifications(notifs as NotificationItem[])
-      setUnreadCount(count as number)
+
+      let notifications = notifs as NotificationItem[]
+      let unread = count as number
+
+      if (notifications.length === 0) {
+        await backfillPendingExpenseNotifications()
+        const [refetchedNotifs, refetchedCount] = await Promise.all([
+          getMyNotifications(),
+          getUnreadNotificationCount(),
+        ])
+        notifications = refetchedNotifs as NotificationItem[]
+        unread = refetchedCount as number
+      }
+
+      setNotifications(notifications)
+      setUnreadCount(unread)
     } catch {
       // silent
     }
