@@ -156,6 +156,7 @@ export default async function AdminMemberStatementPage({
         title: true,
         createdAt: true,
         createdById: true,
+        category: true,
       },
     }),
     prisma.fund.findMany({
@@ -208,6 +209,9 @@ export default async function AdminMemberStatementPage({
   const filteredRows = selectedCategory === "all" ? rows : rows.filter((row) => row.category === selectedCategory)
   const categoryExpenseTotal = filteredRows.reduce((sum, row) => sum + (row.debit ?? 0), 0)
   const categoryCollectionTotal = filteredRows.reduce((sum, row) => sum + (row.credit ?? 0), 0)
+
+  const advanceTotal = expenses.filter((e) => e.category?.toLowerCase() === "advance").reduce((sum, e) => sum + e.amount, 0)
+  const salaryTotal = expenses.filter((e) => e.category?.toLowerCase() === "salary").reduce((sum, e) => sum + e.amount, 0)
 
   const ledger = filteredRows.reduce<LedgerRow[]>((accumulator, row) => {
     const previousBalance = accumulator.at(-1)?.amount ?? 0
@@ -283,7 +287,7 @@ export default async function AdminMemberStatementPage({
         </form>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
             {selectedCategory === "all" ? "Total Expense" : "Category Expense Total"}
@@ -295,6 +299,16 @@ export default async function AdminMemberStatementPage({
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Collection Total</p>
           <p className="mt-2 text-2xl font-bold text-blue-700">{formatCurrency(categoryCollectionTotal)}</p>
           <p className="mt-1 text-xs text-gray-500">Collection rows included in the current view</p>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-orange-500">Advance Total</p>
+          <p className="mt-2 text-2xl font-bold text-orange-700">{formatCurrency(advanceTotal)}</p>
+          <p className="mt-1 text-xs text-gray-500">All advance expenses</p>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-purple-500">Salary Total</p>
+          <p className="mt-2 text-2xl font-bold text-purple-700">{formatCurrency(salaryTotal)}</p>
+          <p className="mt-1 text-xs text-gray-500">All salary expenses</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Entries</p>

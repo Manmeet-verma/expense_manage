@@ -48,6 +48,8 @@ const EXPENSE_CATEGORIES = [
   "HOTEL",
   "PETROL",
   "DIESEL",
+  "ADVANCE",
+  "SALARY",
   "OTHER",
 ] as const
 

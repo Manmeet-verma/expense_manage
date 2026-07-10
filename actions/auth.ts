@@ -457,7 +457,7 @@ export async function getMembers() {
       description: { not: null },
       createdBy: { role: "MEMBER" },
     },
-    select: { id: true, amount: true, description: true, createdById: true, createdAt: true },
+    select: { id: true, amount: true, description: true, createdById: true, createdAt: true, category: true },
   })
 
   function escapeRegExp(value: string) {
@@ -474,6 +474,8 @@ export async function getMembers() {
 
   const mentionCollectionByMember = new Map<string, number>()
   for (const exp of otherExpenses) {
+    const cat = exp.category?.toLowerCase()
+    if (cat === "advance" || cat === "salary") continue
     const sourceText = exp.description?.trim() || ""
     if (!sourceText) continue
     const mentionedId = findMention(sourceText)
@@ -482,8 +484,42 @@ export async function getMembers() {
     }
   }
 
+  const fundTotalByMember = new Map<string, number>()
+  for (const fund of allFunds) {
+    fundTotalByMember.set(fund.userId, (fundTotalByMember.get(fund.userId) || 0) + fund.amount)
+  }
+
+  const otherExpensesByMember = new Map<string, { amount: number; category: string }[]>()
+  for (const exp of otherExpenses) {
+    const mentionedId = findMention(exp.description?.trim() || "")
+    if (mentionedId) {
+      const arr = otherExpensesByMember.get(mentionedId) || []
+      arr.push({ amount: exp.amount, category: exp.category })
+      otherExpensesByMember.set(mentionedId, arr)
+    }
+  }
+
+  const advanceByMember = new Map<string, number>()
+  const salaryByMember = new Map<string, number>()
+
+  const memberExpenses = await prisma.expense.findMany({
+    where: {
+      createdById: { in: members.map((m) => m.id) },
+      category: { in: ["Advance", "Salary"] },
+    },
+    select: { createdById: true, amount: true, category: true },
+  })
+
+  for (const exp of memberExpenses) {
+    if (exp.category?.toLowerCase() === "advance") {
+      advanceByMember.set(exp.createdById, (advanceByMember.get(exp.createdById) || 0) + exp.amount)
+    } else if (exp.category?.toLowerCase() === "salary") {
+      salaryByMember.set(exp.createdById, (salaryByMember.get(exp.createdById) || 0) + exp.amount)
+    }
+  }
+
   return members.map((member) => {
-    const fundTotal = (fundsByMember.get(member.id) || []).reduce((sum, f) => sum + f.amount, 0)
+    const fundTotal = fundTotalByMember.get(member.id) || 0
     const mentionTotal = mentionCollectionByMember.get(member.id) || 0
     return {
       id: member.id,
@@ -493,6 +529,8 @@ export async function getMembers() {
       createdAt: member.createdAt,
       _count: member._count,
       totalEdits: member.expenses.reduce((sum, expense) => sum + expense.editCount, 0),
+      advanceTotal: advanceByMember.get(member.id) || 0,
+      salaryTotal: salaryByMember.get(member.id) || 0,
     }
   })
 }

@@ -10,6 +10,8 @@ type MemberRow = {
   receivedAmount: number
   totalEdits: number
   createdAt: Date
+  advanceTotal: number
+  salaryTotal: number
   _count: {
     expenses: number
   }

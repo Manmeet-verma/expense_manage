@@ -99,6 +99,7 @@ export async function GET(request: NextRequest) {
             title: true,
             createdAt: true,
             createdById: true,
+            category: true,
           },
           take: 5000,
         }),

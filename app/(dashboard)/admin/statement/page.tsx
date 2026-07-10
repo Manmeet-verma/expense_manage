@@ -64,7 +64,7 @@ export default async function AdminStatementPage({
 
   const rows = await Promise.all(
     members.map(async (member) => {
-      const [expenseTotalResult, expenseCountResult, funds, collectionExpenses] = await Promise.all([
+      const [expenseTotalResult, expenseCountResult, funds, collectionExpenses, advanceTotalResult, salaryTotalResult] = await Promise.all([
         prisma.expense.aggregate({
           where: { createdById: member.id, ...dateFilter },
           _sum: { amount: true },
@@ -96,7 +96,16 @@ export default async function AdminStatementPage({
             title: true,
             createdAt: true,
             createdById: true,
+            category: true,
           },
+        }),
+        prisma.expense.aggregate({
+          where: { createdById: member.id, category: "Advance", ...dateFilter },
+          _sum: { amount: true },
+        }),
+        prisma.expense.aggregate({
+          where: { createdById: member.id, category: "Salary", ...dateFilter },
+          _sum: { amount: true },
         }),
       ])
 
@@ -110,12 +119,16 @@ export default async function AdminStatementPage({
       const expenseTotal = expenseTotalResult._sum.amount || 0
       const expenseCount = expenseCountResult
       const collectionTotal = collectionRows.reduce((sum, row) => sum + row.amount, 0)
+      const advanceTotal = advanceTotalResult._sum.amount || 0
+      const salaryTotal = salaryTotalResult._sum.amount || 0
 
       return {
         ...member,
         expenseTotal,
         expenseCount,
         collectionTotal,
+        advanceTotal,
+        salaryTotal,
         amount: collectionTotal - expenseTotal,
       }
     })
@@ -170,13 +183,15 @@ export default async function AdminStatementPage({
                 <th className="px-4 py-3 font-semibold text-right">Exp. Count</th>
                 <th className="px-4 py-3 font-semibold text-right">Expense</th>
                 <th className="px-4 py-3 font-semibold text-right">Collection</th>
+                <th className="px-4 py-3 font-semibold text-right text-orange-700">Advance</th>
+                <th className="px-4 py-3 font-semibold text-right text-purple-700">Salary</th>
                 <th className="px-4 py-3 font-semibold text-right">Amount</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
                     No members found
                   </td>
                 </tr>
@@ -194,6 +209,8 @@ export default async function AdminStatementPage({
                     <td className="px-4 py-3 text-right text-gray-700">{member.expenseCount || 0}</td>
                     <td className="px-4 py-3 text-right text-red-700 font-medium">{formatCurrency(member.expenseTotal)}</td>
                     <td className="px-4 py-3 text-right text-blue-700 font-medium">{formatCurrency(member.collectionTotal)}</td>
+                    <td className="px-4 py-3 text-right text-orange-700 font-medium">{formatCurrency(member.advanceTotal)}</td>
+                    <td className="px-4 py-3 text-right text-purple-700 font-medium">{formatCurrency(member.salaryTotal)}</td>
                     <td className={`px-4 py-3 text-right font-semibold ${member.amount < 0 ? "text-red-700" : "text-gray-900"}`}>
                       {formatCurrency(member.amount)}
                     </td>
@@ -225,6 +242,14 @@ export default async function AdminStatementPage({
                   <div>
                     <p className="text-gray-500">Collection</p>
                     <p className="font-medium text-gray-900">{formatCurrency(member.collectionTotal)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Advance</p>
+                    <p className="font-medium text-orange-700">{formatCurrency(member.advanceTotal)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Salary</p>
+                    <p className="font-medium text-purple-700">{formatCurrency(member.salaryTotal)}</p>
                   </div>
                   <div>
                     <p className="text-gray-500">Amount</p>

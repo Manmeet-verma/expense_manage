@@ -19,6 +19,8 @@ interface MemberRow {
   receivedAmount: number
   totalEdits: number
   createdAt: Date
+  advanceTotal: number
+  salaryTotal: number
   _count: {
     expenses: number
   }
@@ -523,6 +525,8 @@ export default function MembersContent({
                   <th className="px-4 py-3 font-semibold">Email</th>
                   <th className="px-4 py-3 font-semibold">Expenses</th>
                   <th className="px-4 py-3 font-semibold">Collection</th>
+                  <th className="px-4 py-3 font-semibold">Advance</th>
+                  <th className="px-4 py-3 font-semibold">Salary</th>
                   <th className="px-4 py-3 font-semibold">Edits</th>
                   <th className="px-4 py-3 font-semibold">Joined</th>
                   <th className="px-4 py-3 font-semibold">Actions</th>
@@ -531,7 +535,7 @@ export default function MembersContent({
               <tbody>
                 {members.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
+                    <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
                       No members found
                     </td>
                   </tr>
@@ -549,6 +553,8 @@ export default function MembersContent({
                       <td className="px-4 py-3 text-gray-700">{member.email}</td>
                       <td className="px-4 py-3 text-gray-700">{member._count.expenses}</td>
                       <td className="px-4 py-3 text-gray-700">{formatCurrency(member.receivedAmount)}</td>
+                      <td className="px-4 py-3 text-orange-700">{formatCurrency(member.advanceTotal || 0)}</td>
+                      <td className="px-4 py-3 text-purple-700">{formatCurrency(member.salaryTotal || 0)}</td>
                       <td className="px-4 py-3 text-gray-700">{member.totalEdits}</td>
                       <td className="px-4 py-3 text-gray-700">{formatDate(member.createdAt)}</td>
                       <td className="px-4 py-3">
@@ -595,6 +601,14 @@ export default function MembersContent({
                     <div>
                       <p className="text-gray-500">Collection</p>
                       <p className="font-medium text-gray-900">{formatCurrency(member.receivedAmount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Advance</p>
+                      <p className="font-medium text-orange-700">{formatCurrency(member.advanceTotal || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Salary</p>
+                      <p className="font-medium text-purple-700">{formatCurrency(member.salaryTotal || 0)}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Edits</p>

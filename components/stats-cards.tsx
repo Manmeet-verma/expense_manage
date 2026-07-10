@@ -20,6 +20,8 @@ interface StatsCardsProps {
     totalBudget?: number
     submittedAmount?: number
     remainingBudget?: number
+    totalAdvanceAmount?: number
+    totalSalaryAmount?: number
   }
 }
 
@@ -84,6 +86,22 @@ export function StatsCards({ stats, mode = "member" }: StatsCardsProps) {
       color: "text-teal-600",
       bgColor: "bg-teal-50",
       barColor: "bg-teal-500",
+    },
+    {
+      title: "Advance",
+      value: formatCurrency(stats.totalAdvanceAmount ?? 0),
+      icon: DollarSign,
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+      barColor: "bg-orange-500",
+    },
+    {
+      title: "Salary",
+      value: formatCurrency(stats.totalSalaryAmount ?? 0),
+      icon: DollarSign,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+      barColor: "bg-purple-500",
     },
   ]
 
@@ -150,7 +168,7 @@ export function StatsCards({ stats, mode = "member" }: StatsCardsProps) {
   const gridClass =
     mode === "admin"
       ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
-      : "grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7"
+      : "grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-9"
 
   return (
     <div className={gridClass}>

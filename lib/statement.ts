@@ -18,6 +18,7 @@ export type StatementExpenseRow = {
   title: string
   createdAt: Date
   createdById: string
+  category: string
 }
 
 export function buildMemberLinks(
@@ -90,6 +91,11 @@ export function buildStatementCollectionRows({
 
   for (const expense of expenses) {
     if (expense.createdById === memberId || referencedExpenseIds.has(expense.id)) {
+      continue
+    }
+
+    const category = expense.category?.toLowerCase()
+    if (category === "advance" || category === "salary") {
       continue
     }
 

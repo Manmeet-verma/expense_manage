@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { auth, hashPassword } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 import { findFirstMention } from "@/lib/statement"
+import { createNotificationsForAllUsers, createNotification } from "./notification"
 
 const optionalStringSchema = z.preprocess(
   (value) => (value === null || value === "" ? undefined : value),
@@ -51,7 +52,7 @@ export async function createExpense(data: z.infer<typeof expenseSchema>) {
 
   const { title, description, amount, category } = result.data
 
-  await prisma.expense.create({
+  const expense = await prisma.expense.create({
     data: {
       title: title || category,
       description,
@@ -59,6 +60,15 @@ export async function createExpense(data: z.infer<typeof expenseSchema>) {
       category,
       createdById: session.user.id,
     },
+  })
+
+  const memberName = session.user.name || session.user.email
+
+  await createNotificationsForAllUsers({
+    title: "New Expense Added",
+    message: `${memberName} added a ${category} expense of ₹${amount.toLocaleString("en-IN")}`,
+    type: "EXPENSE_CREATED",
+    excludeUserId: session.user.id,
   })
 
   revalidatePath("/dashboard")
@@ -332,6 +342,17 @@ export async function approveOrRejectExpense(data: z.infer<typeof approvalSchema
     },
   })
 
+  const reviewerName = session.user.name || session.user.email
+  const actionText = status === "APPROVED" ? "approved" : "rejected"
+  const notificationType = status === "APPROVED" ? "EXPENSE_APPROVED" : "EXPENSE_REJECTED"
+
+  await createNotification({
+    title: `Expense ${status.charAt(0) + status.slice(1).toLowerCase()}`,
+    message: `${reviewerName} ${actionText} your ${expense.category} expense of ₹${expense.amount.toLocaleString("en-IN")}${adminRemark ? ` - ${adminRemark}` : ""}`,
+    type: notificationType,
+    userId: expense.createdById,
+  })
+
   revalidatePath("/admin")
   revalidatePath("/admin/members")
   return { success: true }
@@ -366,12 +387,17 @@ export async function bulkApprovePendingMemberExpenses(data: { ids: string[] }) 
     },
     select: {
       id: true,
+      amount: true,
+      category: true,
+      createdById: true,
     },
   })
 
   if (expenses.length !== ids.length) {
     return { error: "One or more selected expenses are no longer pending" }
   }
+
+  const reviewerName = session.user.name || session.user.email
 
   await prisma.$transaction(
     ids.map((id) =>
@@ -381,6 +407,15 @@ export async function bulkApprovePendingMemberExpenses(data: { ids: string[] }) 
       })
     )
   )
+
+  for (const exp of expenses) {
+    await createNotification({
+      title: "Expense Approved",
+      message: `${reviewerName} approved your ${exp.category} expense of ₹${exp.amount.toLocaleString("en-IN")}`,
+      type: "EXPENSE_APPROVED",
+      userId: exp.createdById,
+    })
+  }
 
   revalidatePath("/dashboard")
   revalidatePath("/admin")
@@ -502,6 +537,15 @@ export async function markExpensePaid(data: z.infer<typeof paymentSchema>) {
     revalidatePath(`/dashboard/statement`)
   }
 
+  const adminName = session.user.name || session.user.email
+
+  await createNotification({
+    title: "Expense Paid",
+    message: `${adminName} marked your ${expense.category} expense of ₹${expense.amount.toLocaleString("en-IN")} as paid`,
+    type: "EXPENSE_PAID",
+    userId: expense.createdById,
+  })
+
   revalidatePath("/admin")
   revalidatePath("/admin/members")
   return { success: true }
@@ -582,11 +626,13 @@ export async function getExpenseStats() {
         createdById: { not: session.user.id },
         description: { not: null },
       },
-      select: { id: true, amount: true, description: true, title: true },
+      select: { id: true, amount: true, description: true, title: true, category: true },
     })
 
     for (const exp of otherExpenses) {
       if (referencedExpenseIds.has(exp.id)) continue
+      const cat = exp.category?.toLowerCase()
+      if (cat === "advance" || cat === "salary") continue
       const sourceText = exp.description?.trim() || exp.title.trim()
       if (!sourceText) continue
       const mention = findFirstMention(sourceText, memberLinks)
@@ -601,6 +647,18 @@ export async function getExpenseStats() {
     where,
     _sum: { amount: true },
   })
+
+  // Get Advance and Salary totals
+  const [advanceTotal, salaryTotal] = await Promise.all([
+    prisma.expense.aggregate({
+      where: { ...where, category: "Advance" },
+      _sum: { amount: true },
+    }),
+    prisma.expense.aggregate({
+      where: { ...where, category: "Salary" },
+      _sum: { amount: true },
+    }),
+  ])
 
   // Get user's total budget
   let totalBudget = 0
@@ -629,6 +687,8 @@ export async function getExpenseStats() {
     totalBudget,
     submittedAmount: submittedTotal,
     remainingBudget,
+    totalAdvanceAmount: advanceTotal._sum.amount || 0,
+    totalSalaryAmount: salaryTotal._sum.amount || 0,
   }
 }
 
@@ -763,6 +823,67 @@ export async function getMyFunds() {
     where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
   })
+}
+
+export async function updateFund(id: string, data: z.infer<typeof fundSchema>) {
+  const session = await auth()
+
+  if (!session?.user) {
+    return { error: "Unauthorized" }
+  }
+
+  const fund = await prisma.fund.findUnique({ where: { id } })
+  if (!fund) return { error: "Fund not found" }
+
+  if (fund.userId !== session.user.id && session.user.role !== "ADMIN") {
+    return { error: "You can only edit your own funds" }
+  }
+
+  const result = fundSchema.safeParse(data)
+  if (!result.success) {
+    return { error: result.error.issues[0].message }
+  }
+
+  const { amount, receivedFrom, paymentMode, upiId, accountNumber, fundDate } = result.data
+
+  await prisma.fund.update({
+    where: { id },
+    data: {
+      amount,
+      receivedFrom,
+      paymentMode,
+      upiId: paymentMode === "GPAY" ? upiId || null : null,
+      accountNumber: paymentMode === "BANK_ACCOUNT" ? accountNumber || null : null,
+      fundDate: fundDate ? new Date(fundDate) : new Date(),
+    },
+  })
+
+  revalidatePath("/dashboard/my-statement")
+  revalidatePath("/dashboard/statement")
+  revalidatePath("/admin/statement")
+  return { success: true }
+}
+
+export async function deleteFund(id: string) {
+  const session = await auth()
+
+  if (!session?.user) {
+    return { error: "Unauthorized" }
+  }
+
+  const fund = await prisma.fund.findUnique({ where: { id } })
+  if (!fund) return { error: "Fund not found" }
+
+  if (fund.userId !== session.user.id && session.user.role !== "ADMIN") {
+    return { error: "You can only delete your own funds" }
+  }
+
+  await prisma.fund.delete({ where: { id } })
+
+  revalidatePath("/dashboard/my-statement")
+  revalidatePath("/dashboard/statement")
+  revalidatePath("/admin/statement")
+  return { success: true }
 }
 
 const distributeFundSchema = z.object({

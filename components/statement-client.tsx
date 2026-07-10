@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatDate, parseJsonSafe } from "@/lib/utils"
 import { Search, CheckCircle, XCircle, Clock, DollarSign, List, Edit, Trash2 } from "lucide-react"
-import { updateExpense, deleteExpense } from "@/actions/expense"
+import { updateExpense, deleteExpense, updateFund, deleteFund } from "@/actions/expense"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
@@ -32,7 +32,7 @@ interface Fund {
   createdAt: Date
 }
 
-type TabType = "all" | "approved" | "rejected" | "pending" | "collection"
+type TabType = "all" | "approved" | "rejected" | "pending" | "collection" | "advance" | "salary"
 
 const CATEGORIES = [
   { value: "FREIGHT", label: "Freight/Gaddi" },
@@ -92,6 +92,14 @@ export function StatementClient({ userId }: { userId: string }) {
     amount: "",
     category: "",
   })
+  const [editingFund, setEditingFund] = useState<Fund | null>(null)
+  const [fundEditForm, setFundEditForm] = useState({
+    receivedFrom: "",
+    amount: "",
+    paymentMode: "",
+    fundDate: "",
+  })
+  const [fundActionLoading, setFundActionLoading] = useState(false)
 
   async function handleSearch() {
     if (!fromDate || !toDate) return
@@ -142,6 +150,66 @@ export function StatementClient({ userId }: { userId: string }) {
       amount: expense.amount.toString(),
       category: expense.category,
     })
+  }
+
+  function openFundEditModal(fund: Fund) {
+    setEditingFund(fund)
+    setFundEditForm({
+      receivedFrom: fund.receivedFrom,
+      amount: fund.amount.toString(),
+      paymentMode: fund.paymentMode,
+      fundDate: toDateInputValue(new Date(fund.fundDate)),
+    })
+  }
+
+  function closeFundEditModal() {
+    if (fundActionLoading) return
+    setEditingFund(null)
+  }
+
+  async function handleFundEditSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!editingFund) return
+
+    setFundActionLoading(true)
+    const result = await updateFund(editingFund.id, {
+      receivedFrom: fundEditForm.receivedFrom,
+      amount: parseFloat(fundEditForm.amount),
+      paymentMode: fundEditForm.paymentMode as "CASH" | "GPAY" | "BANK_ACCOUNT",
+      fundDate: fundEditForm.fundDate,
+    })
+
+    if (result?.error) {
+      setPendingActionError(result.error)
+      setFundActionLoading(false)
+      return
+    }
+
+    setFundActionLoading(false)
+    setEditingFund(null)
+    setPendingActionSuccess("Collection updated successfully")
+    await handleSearch()
+    router.refresh()
+    setTimeout(() => setPendingActionSuccess(""), 2500)
+  }
+
+  async function handleFundDelete(fundId: string) {
+    const confirmed = window.confirm("Delete this collection record?")
+    if (!confirmed) return
+
+    setFundActionLoading(true)
+    const result = await deleteFund(fundId)
+    if (result?.error) {
+      setPendingActionError(result.error)
+      setFundActionLoading(false)
+      return
+    }
+
+    setFundActionLoading(false)
+    setPendingActionSuccess("Collection deleted successfully")
+    await handleSearch()
+    router.refresh()
+    setTimeout(() => setPendingActionSuccess(""), 2500)
   }
 
   function closeEditModal() {
@@ -201,6 +269,8 @@ export function StatementClient({ userId }: { userId: string }) {
   }
 
   const allExpenses = [...approvedExpenses, ...rejectedExpenses, ...pendingExpenses]
+  const advanceExpenses = allExpenses.filter((e) => e.category?.toLowerCase() === "advance")
+  const salaryExpenses = allExpenses.filter((e) => e.category?.toLowerCase() === "salary")
 
   const filteredExpenses = (expenses: Expense[]) => {
     if (!searchTerm) return expenses
@@ -231,6 +301,10 @@ export function StatementClient({ userId }: { userId: string }) {
         return { data: filteredExpenses(pendingExpenses), total: pendingExpenses.reduce((sum, e) => sum + e.amount, 0) }
       case "collection":
         return { data: filteredFunds(collectionFunds), total: collectionFunds.reduce((sum, f) => sum + f.amount, 0), isCollection: true }
+      case "advance":
+        return { data: filteredExpenses(advanceExpenses), total: advanceExpenses.reduce((sum, e) => sum + e.amount, 0) }
+      case "salary":
+        return { data: filteredExpenses(salaryExpenses), total: salaryExpenses.reduce((sum, e) => sum + e.amount, 0) }
       case "all":
       default:
         return { data: filteredExpenses(allExpenses), total: allExpenses.reduce((sum, e) => sum + e.amount, 0) }
@@ -245,6 +319,8 @@ export function StatementClient({ userId }: { userId: string }) {
     rejected: "bg-red-100 text-red-700 border-red-300",
     pending: "bg-yellow-100 text-yellow-700 border-yellow-300",
     collection: "bg-purple-100 text-purple-700 border-purple-300",
+    advance: "bg-orange-100 text-orange-700 border-orange-300",
+    salary: "bg-purple-100 text-purple-700 border-purple-300",
   }
 
   const tabColors = {
@@ -253,6 +329,8 @@ export function StatementClient({ userId }: { userId: string }) {
     rejected: "text-red-600",
     pending: "text-yellow-600",
     collection: "text-purple-600",
+    advance: "text-orange-600",
+    salary: "text-purple-600",
   }
 
   return (
@@ -362,6 +440,24 @@ export function StatementClient({ userId }: { userId: string }) {
               <Clock className="w-3 h-3" />
               Pending ({pendingExpenses.length})
             </button>
+            <button
+              onClick={() => setActiveTab("advance")}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition border ${
+                activeTab === "advance" ? statusColors.advance : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <DollarSign className="w-3 h-3" />
+              Advance ({advanceExpenses.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("salary")}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition border ${
+                activeTab === "salary" ? statusColors.salary : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <DollarSign className="w-3 h-3" />
+              Salary ({salaryExpenses.length})
+            </button>
             <div className="ml-auto flex items-center gap-2">
               <span className="text-xs text-gray-500">Total:</span>
               <span className={`text-sm font-bold ${tabColors[activeTab]}`}>
@@ -385,6 +481,7 @@ export function StatementClient({ userId }: { userId: string }) {
                         <th className="px-2 py-1.5 font-medium text-gray-600">Received From</th>
                         <th className="px-2 py-1.5 font-medium text-gray-600">Mode</th>
                         <th className="px-2 py-1.5 font-medium text-gray-600 text-right">Amount</th>
+                        <th className="px-2 py-1.5 font-medium text-gray-600 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -398,6 +495,30 @@ export function StatementClient({ userId }: { userId: string }) {
                             </span>
                           </td>
                           <td className="px-2 py-1.5 font-medium text-gray-900 text-right">{formatCurrency(fund.amount)}</td>
+                          <td className="px-2 py-1.5 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-1.5"
+                                onClick={() => openFundEditModal(fund)}
+                                disabled={fundActionLoading}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                className="h-6 px-1.5"
+                                onClick={() => void handleFundDelete(fund.id)}
+                                disabled={fundActionLoading}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -539,6 +660,80 @@ export function StatementClient({ userId }: { userId: string }) {
                       </Button>
                       <Button type="submit" className="flex-1" disabled={pendingActionLoading}>
                         {pendingActionLoading ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {editingFund && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+              <Card className="w-full max-w-md">
+                <CardContent className="p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-gray-900">Edit Collection</h3>
+                    <Button variant="ghost" size="sm" onClick={closeFundEditModal} disabled={fundActionLoading}>
+                      x
+                    </Button>
+                  </div>
+
+                  <form onSubmit={handleFundEditSubmit} className="space-y-3">
+                    <div>
+                      <Label htmlFor="fund-receivedFrom">Received From</Label>
+                      <Input
+                        id="fund-receivedFrom"
+                        value={fundEditForm.receivedFrom}
+                        onChange={(e) => setFundEditForm((prev) => ({ ...prev, receivedFrom: e.target.value }))}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="fund-amount">Amount</Label>
+                      <Input
+                        id="fund-amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={fundEditForm.amount}
+                        onChange={(e) => setFundEditForm((prev) => ({ ...prev, amount: e.target.value }))}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="fund-paymentMode">Payment Mode</Label>
+                      <Select
+                        id="fund-paymentMode"
+                        value={fundEditForm.paymentMode}
+                        onChange={(e) => setFundEditForm((prev) => ({ ...prev, paymentMode: e.currentTarget.value }))}
+                        required
+                      >
+                        <option value="CASH">Cash</option>
+                        <option value="GPAY">GPay</option>
+                        <option value="BANK_ACCOUNT">Bank Account</option>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="fund-fundDate">Date</Label>
+                      <Input
+                        id="fund-fundDate"
+                        type="date"
+                        value={fundEditForm.fundDate}
+                        onChange={(e) => setFundEditForm((prev) => ({ ...prev, fundDate: e.target.value }))}
+                        required
+                      />
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <Button type="button" variant="outline" className="flex-1" onClick={closeFundEditModal} disabled={fundActionLoading}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" className="flex-1" disabled={fundActionLoading}>
+                        {fundActionLoading ? "Saving..." : "Save"}
                       </Button>
                     </div>
                   </form>
