@@ -42,12 +42,16 @@ export async function GET(request: NextRequest) {
     const expenses = await withTimeout(
       prisma.expense.findMany({
         where: {
-          createdAt: {
-            gte: dateRange.fromDateTime,
-            lte: dateRange.toDateTime,
-          },
           status: status as "APPROVED" | "REJECTED" | "PENDING" | "PAID",
           createdById: userId || session.user.id,
+          ...(status === "PENDING"
+            ? {}
+            : {
+                createdAt: {
+                  gte: dateRange.fromDateTime,
+                  lte: dateRange.toDateTime,
+                },
+              }),
         },
         orderBy: { createdAt: "desc" },
         take: 5000,

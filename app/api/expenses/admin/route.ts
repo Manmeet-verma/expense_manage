@@ -31,10 +31,15 @@ export async function GET(request: NextRequest) {
   }
 
   if (dateRange) {
-    where.createdAt = {
-      gte: dateRange.fromDateTime,
-      lte: dateRange.toDateTime,
-    }
+    where.OR = [
+      { status: "PENDING" },
+      {
+        createdAt: {
+          gte: dateRange.fromDateTime,
+          lte: dateRange.toDateTime,
+        },
+      },
+    ]
   }
 
   const expenses = await prisma.expense.findMany({

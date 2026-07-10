@@ -55,24 +55,34 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   const where: {
     createdById: string
-    status: {
+    status?: {
       in: ExpenseStatus[]
     }
+    OR?: Array<Record<string, unknown>>
     createdAt?: {
       gte: Date
       lte: Date
     }
   } = {
     createdById: memberId,
-    status: {
-      in: ["APPROVED", "REJECTED", "PENDING"],
-    },
   }
 
   if (dateRange) {
-    where.createdAt = {
-      gte: dateRange.fromDateTime,
-      lte: dateRange.toDateTime,
+    where.OR = [
+      { status: "PENDING" },
+      {
+        status: {
+          in: ["APPROVED", "REJECTED"],
+        },
+        createdAt: {
+          gte: dateRange.fromDateTime,
+          lte: dateRange.toDateTime,
+        },
+      },
+    ]
+  } else {
+    where.status = {
+      in: ["APPROVED", "REJECTED", "PENDING"],
     }
   }
 
