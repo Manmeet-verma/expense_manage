@@ -159,13 +159,13 @@ export function Navigation({ user }: NavProps) {
                   Logout
                 </Button>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 md:hidden">
                 <NotificationBell />
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={toggleMobileMenu}
-                  className="h-8 w-8 p-0 md:hidden"
+                  className="h-8 w-8 p-0"
                 >
                   <List className="w-5 h-5" />
                 </Button>

@@ -804,6 +804,15 @@ export async function createFund(data: z.infer<typeof fundSchema>) {
     },
   })
 
+  const memberName = session.user.name || session.user.email
+
+  await createNotificationsForAllUsers({
+    title: "Collection Deposited",
+    message: `${memberName} deposited ₹${amount.toLocaleString("en-IN")} via ${paymentMode.replace("_", " ").toLowerCase()}`,
+    type: "FUND_RECEIVED",
+    excludeUserId: session.user.id,
+  })
+
   revalidatePath("/dashboard/my-statement")
   return { success: true }
 }
@@ -985,6 +994,19 @@ export async function distributeFund(data: z.infer<typeof distributeFundSchema>)
       },
     }),
   ])
+
+  const memberDetails = await prisma.user.findUnique({
+    where: { id: memberId },
+    select: { name: true, email: true },
+  })
+  const memberName = memberDetails?.name || memberDetails?.email || "Member"
+
+  await createNotification({
+    title: "Fund Received",
+    message: `${distributedBy} distributed ₹${amount.toLocaleString("en-IN")}${description ? ` for ${description}` : ""} to ${memberName}`,
+    type: "FUND_RECEIVED",
+    userId: memberId,
+  })
 
   revalidateDistributionPaths()
   return { success: true }
