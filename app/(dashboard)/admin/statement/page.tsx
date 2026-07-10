@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import { formatCurrency } from "@/lib/utils"
 import { buildMemberLinks, buildStatementCollectionRows } from "@/lib/statement"
+import { AdminPendingCollections } from "@/components/admin-pending-collections"
 
 function getTodayString(): string {
   const today = new Date()
@@ -137,12 +138,33 @@ export default async function AdminStatementPage({
     })
   )
 
+  const pendingFunds = await prisma.fund.findMany({
+    where: { status: "PENDING" },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  })
+
+  const pendingCollectionFunds = pendingFunds.map((fund) => ({
+    id: fund.id,
+    amount: fund.amount,
+    receivedFrom: fund.receivedFrom,
+    paymentMode: fund.paymentMode,
+    fundDate: fund.fundDate,
+    status: fund.status,
+    memberName: fund.user.name || fund.user.email || "Unknown",
+    memberId: fund.user.id,
+  }))
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Statement</h1>
         <p className="mt-1 text-gray-600">Select a member to open the bank-style statement</p>
       </div>
+
+      <AdminPendingCollections initialFunds={pendingCollectionFunds} />
 
       <form method="get" className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-white p-4">
         <div>
