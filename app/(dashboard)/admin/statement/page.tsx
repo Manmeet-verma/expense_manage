@@ -6,6 +6,18 @@ import { formatCurrency } from "@/lib/utils"
 import { buildMemberLinks, buildStatementCollectionRows } from "@/lib/statement"
 import { AdminPendingCollections } from "@/components/admin-pending-collections"
 
+interface MemberRow {
+  id: string
+  name: string | null
+  email: string
+  expenseTotal: number
+  expenseCount: number
+  collectionTotal: number
+  advanceTotal: number
+  salaryTotal: number
+  amount: number
+}
+
 function getTodayString(): string {
   const today = new Date()
   const year = today.getFullYear()
@@ -47,10 +59,6 @@ export default async function AdminStatementPage({
     ? { createdAt: { gte: dateRange.fromDateTime, lte: dateRange.toDateTime } }
     : {}
 
-  const fundDateFilter = dateRange
-    ? { fundDate: { gte: dateRange.fromDateTime, lte: dateRange.toDateTime } }
-    : {}
-
   const members = await prisma.user.findMany({
     where: { role: "MEMBER" },
     select: {
@@ -63,8 +71,8 @@ export default async function AdminStatementPage({
 
   const memberLinks = buildMemberLinks(members)
 
-  const rows = await Promise.all(
-    members.map(async (member) => {
+  const rows: MemberRow[] = await Promise.all(
+    members.map(async (member: { id: string; name: string | null; email: string }) => {
       const [expenseTotalResult, expenseCountResult, funds, collectionExpenses, advanceTotalResult, salaryTotalResult] = await Promise.all([
         prisma.expense.aggregate({
           where: { createdById: member.id, ...dateFilter },
@@ -112,7 +120,7 @@ export default async function AdminStatementPage({
         }),
       ])
 
-      const approvedFunds = funds.filter((f) => f.status === "APPROVED")
+      const approvedFunds = funds.filter((f: (typeof funds)[number]) => f.status === "APPROVED")
       const collectionRows = buildStatementCollectionRows({
         memberId: member.id,
         memberLinks,
@@ -122,12 +130,14 @@ export default async function AdminStatementPage({
 
       const expenseTotal = expenseTotalResult._sum.amount || 0
       const expenseCount = expenseCountResult
-      const collectionTotal = collectionRows.reduce((sum, row) => sum + row.amount, 0)
+      const collectionTotal = collectionRows.reduce((sum: number, row: { amount: number }) => sum + row.amount, 0)
       const advanceTotal = advanceTotalResult._sum.amount || 0
       const salaryTotal = salaryTotalResult._sum.amount || 0
 
       return {
-        ...member,
+        id: member.id,
+        name: member.name,
+        email: member.email,
         expenseTotal,
         expenseCount,
         collectionTotal,
@@ -221,7 +231,7 @@ export default async function AdminStatementPage({
                   </td>
                 </tr>
               ) : (
-                rows.map((member, index) => (
+                rows.map((member: MemberRow, index: number) => (
                   <tr
                     key={member.id}
                     className={`${index % 2 === 0 ? "bg-gray-50" : "bg-gray-100"} border-t border-gray-100`}
@@ -250,7 +260,7 @@ export default async function AdminStatementPage({
           {rows.length === 0 ? (
             <div className="px-4 py-8 text-center text-gray-500">No members found</div>
           ) : (
-            rows.map((member, index) => (
+            rows.map((member: MemberRow, index: number) => (
               <div key={member.id} className={`${index % 2 === 0 ? "bg-gray-50" : "bg-gray-100"} p-4 space-y-3`}>
                 <Link href={`/admin/statement/${member.id}`} className="font-semibold text-blue-700 hover:text-blue-800">
                   {member.name || member.email}
