@@ -139,14 +139,14 @@ export default async function AdminStatementPage({
   )
 
   const pendingFunds = await prisma.fund.findMany({
-    where: { status: "PENDING" },
+    where: { status: "PENDING" as const },
     include: {
       user: { select: { id: true, name: true, email: true } },
     },
     orderBy: { createdAt: "desc" },
   })
 
-  const pendingCollectionFunds = pendingFunds.map((fund) => ({
+  const pendingCollectionFunds = pendingFunds.map((fund: (typeof pendingFunds)[number]) => ({
     id: fund.id,
     amount: fund.amount,
     receivedFrom: fund.receivedFrom,
