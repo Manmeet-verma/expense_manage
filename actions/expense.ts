@@ -572,11 +572,11 @@ export async function getExpenseStats() {
     : { createdById: session.user.id }
 
   const [total, pending, approved, rejected, paid] = await Promise.all([
-    prisma.expense.count({ where: { ...where, category: { notIn: ["Advance", "Salary"] } } }),
-    prisma.expense.count({ where: { ...where, status: "PENDING", category: { notIn: ["Advance", "Salary"] } } }),
-    prisma.expense.count({ where: { ...where, status: "APPROVED", category: { notIn: ["Advance", "Salary"] } } }),
-    prisma.expense.count({ where: { ...where, status: "REJECTED", category: { notIn: ["Advance", "Salary"] } } }),
-    prisma.expense.count({ where: { ...where, status: "PAID", category: { notIn: ["Advance", "Salary"] } } }),
+    prisma.expense.count({ where }),
+    prisma.expense.count({ where: { ...where, status: "PENDING" } }),
+    prisma.expense.count({ where: { ...where, status: "APPROVED" } }),
+    prisma.expense.count({ where: { ...where, status: "REJECTED" } }),
+    prisma.expense.count({ where: { ...where, status: "PAID" } }),
   ])
 
   const [totalApprovedAmount, totalPaidAmount, totalPendingAmount, totalRejectedAmount] = await Promise.all([
@@ -651,9 +651,9 @@ export async function getExpenseStats() {
     }
   }
 
-  // Get submitted expenses total (PENDING + APPROVED + REJECTED) - excluding Advance and Salary
+  // Get submitted expenses total (PENDING + APPROVED + REJECTED)
   const submittedAmount = await prisma.expense.aggregate({
-    where: { ...where, category: { notIn: ["Advance", "Salary"] } },
+    where,
     _sum: { amount: true },
   })
 

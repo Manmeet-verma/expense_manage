@@ -44,7 +44,6 @@ export async function GET(request: NextRequest) {
         where: {
           status: status as "APPROVED" | "REJECTED" | "PENDING" | "PAID",
           createdById: userId || session.user.id,
-          category: { notIn: ["Advance", "Salary"] },
           ...(status === "PENDING"
             ? {}
             : {

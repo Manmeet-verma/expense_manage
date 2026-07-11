@@ -67,11 +67,11 @@ export default async function AdminStatementPage({
     members.map(async (member) => {
       const [expenseTotalResult, expenseCountResult, funds, collectionExpenses, advanceTotalResult, salaryTotalResult] = await Promise.all([
         prisma.expense.aggregate({
-          where: { createdById: member.id, category: { notIn: ["Advance", "Salary"] }, ...dateFilter },
+          where: { createdById: member.id, ...dateFilter },
           _sum: { amount: true },
         }),
         prisma.expense.count({
-          where: { createdById: member.id, category: { notIn: ["Advance", "Salary"] }, ...dateFilter },
+          where: { createdById: member.id, ...dateFilter },
         }),
         prisma.fund.findMany({
           where: { userId: member.id },
