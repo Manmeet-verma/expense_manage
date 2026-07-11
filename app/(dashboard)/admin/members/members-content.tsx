@@ -261,7 +261,8 @@ export default function MembersContent({
         rejected: expensesData.rejected || [],
         pending: expensesData.pending || [],
       })
-      setCollectionFunds(collectionsData || [])
+      const allFunds = collectionsData?.funds || collectionsData || []
+      setCollectionFunds(Array.isArray(allFunds) ? allFunds : [])
     } catch (error) {
       console.error("Failed to load member expenses:", error)
       alert("Could not load member expenses")
@@ -464,12 +465,12 @@ export default function MembersContent({
 
   const currentTotal =
     activeView === "approved"
-      ? expensesByStatus.approved.reduce((sum, expense) => sum + expense.amount, 0)
+      ? (Array.isArray(expensesByStatus.approved) ? expensesByStatus.approved : []).reduce((sum, expense) => sum + expense.amount, 0)
       : activeView === "rejected"
-        ? expensesByStatus.rejected.reduce((sum, expense) => sum + expense.amount, 0)
+        ? (Array.isArray(expensesByStatus.rejected) ? expensesByStatus.rejected : []).reduce((sum, expense) => sum + expense.amount, 0)
         : activeView === "collection"
-          ? collectionFunds.reduce((sum, fund) => sum + fund.amount, 0)
-          : expensesByStatus.pending.reduce((sum, expense) => sum + expense.amount, 0)
+          ? (Array.isArray(collectionFunds) ? collectionFunds : []).reduce((sum, fund) => sum + fund.amount, 0)
+          : (Array.isArray(expensesByStatus.pending) ? expensesByStatus.pending : []).reduce((sum, expense) => sum + expense.amount, 0)
 
   return (
     <div className="min-h-[calc(100vh-4rem)] p-3 sm:p-6">

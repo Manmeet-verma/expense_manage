@@ -207,13 +207,13 @@ export default async function AdminMemberStatementPage({
 
   const categoryOptions = Array.from(new Set(rows.map((row) => row.category))).sort((a, b) => a.localeCompare(b))
   const filteredRows = selectedCategory === "all" ? rows : rows.filter((row) => row.category === selectedCategory)
-  const categoryExpenseTotal = filteredRows.reduce((sum, row) => sum + (row.debit ?? 0), 0)
-  const categoryCollectionTotal = filteredRows.reduce((sum, row) => sum + (row.credit ?? 0), 0)
+  const categoryExpenseTotal = (Array.isArray(filteredRows) ? filteredRows : []).reduce((sum, row) => sum + (row.debit ?? 0), 0)
+  const categoryCollectionTotal = (Array.isArray(filteredRows) ? filteredRows : []).reduce((sum, row) => sum + (row.credit ?? 0), 0)
 
-  const advanceTotal = expenses.filter((e) => e.category?.toLowerCase() === "advance").reduce((sum, e) => sum + e.amount, 0)
-  const salaryTotal = expenses.filter((e) => e.category?.toLowerCase() === "salary").reduce((sum, e) => sum + e.amount, 0)
+  const advanceTotal = (Array.isArray(expenses) ? expenses : []).filter((e) => e.category?.toLowerCase() === "advance").reduce((sum, e) => sum + e.amount, 0)
+  const salaryTotal = (Array.isArray(expenses) ? expenses : []).filter((e) => e.category?.toLowerCase() === "salary").reduce((sum, e) => sum + e.amount, 0)
 
-  const ledger = filteredRows.reduce<LedgerRow[]>((accumulator, row) => {
+  const ledger = (Array.isArray(filteredRows) ? filteredRows : []).reduce<LedgerRow[]>((accumulator, row) => {
     const previousBalance = accumulator.at(-1)?.amount ?? 0
     const nextBalance = previousBalance + (row.credit ?? 0) - (row.debit ?? 0)
     accumulator.push({ ...row, amount: nextBalance })

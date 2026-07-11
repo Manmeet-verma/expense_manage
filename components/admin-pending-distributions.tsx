@@ -97,7 +97,7 @@ export function AdminPendingDistributions({ initialFunds }: { initialFunds: Pend
               <tfoot>
                 <tr className="bg-gray-50 font-semibold">
                   <td colSpan={4} className="px-3 py-2 text-right text-gray-700">Total Pending:</td>
-                  <td className="px-3 py-2 text-right text-gray-900">{formatCurrency(funds.reduce((sum, f) => sum + f.amount, 0))}</td>
+                  <td className="px-3 py-2 text-right text-gray-900">{formatCurrency((Array.isArray(funds) ? funds : []).reduce((sum, f) => sum + f.amount, 0))}</td>
                   <td></td>
                 </tr>
               </tfoot>

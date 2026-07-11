@@ -130,7 +130,7 @@ export default async function AdminStatementPage({
 
       const expenseTotal = expenseTotalResult._sum.amount || 0
       const expenseCount = expenseCountResult
-      const collectionTotal = collectionRows.reduce((sum: number, row: { amount: number }) => sum + row.amount, 0)
+      const collectionTotal = (Array.isArray(collectionRows) ? collectionRows : []).reduce((sum: number, row: { amount: number }) => sum + row.amount, 0)
       const advanceTotal = advanceTotalResult._sum.amount || 0
       const salaryTotal = salaryTotalResult._sum.amount || 0
 

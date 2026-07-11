@@ -339,22 +339,22 @@ export function StatementClient({ userId }: { userId: string }) {
   const getCurrentData = () => {
     switch (activeTab) {
       case "approved":
-        return { data: filteredExpenses(approvedExpenses), total: approvedExpenses.reduce((sum, e) => sum + e.amount, 0) }
+        return { data: filteredExpenses(approvedExpenses), total: (Array.isArray(approvedExpenses) ? approvedExpenses : []).reduce((sum, e) => sum + e.amount, 0) }
       case "rejected":
-        return { data: filteredExpenses(rejectedExpenses), total: rejectedExpenses.reduce((sum, e) => sum + e.amount, 0) }
+        return { data: filteredExpenses(rejectedExpenses), total: (Array.isArray(rejectedExpenses) ? rejectedExpenses : []).reduce((sum, e) => sum + e.amount, 0) }
       case "pending":
-        return { data: filteredExpenses(pendingExpenses), total: pendingExpenses.reduce((sum, e) => sum + e.amount, 0) }
+        return { data: filteredExpenses(pendingExpenses), total: (Array.isArray(pendingExpenses) ? pendingExpenses : []).reduce((sum, e) => sum + e.amount, 0) }
       case "collection":
-        return { data: filteredFunds(collectionFunds), total: collectionFunds.reduce((sum, f) => sum + f.amount, 0), isCollection: true }
+        return { data: filteredFunds(collectionFunds), total: (Array.isArray(collectionFunds) ? collectionFunds : []).reduce((sum, f) => sum + f.amount, 0), isCollection: true }
       case "pending-collection":
-        return { data: filteredFunds(pendingFunds), total: pendingFunds.reduce((sum, f) => sum + f.amount, 0), isCollection: true, isPendingCollection: true }
+        return { data: filteredFunds(pendingFunds), total: (Array.isArray(pendingFunds) ? pendingFunds : []).reduce((sum, f) => sum + f.amount, 0), isCollection: true, isPendingCollection: true }
       case "advance":
-        return { data: filteredExpenses(advanceExpenses), total: advanceExpenses.reduce((sum, e) => sum + e.amount, 0) }
+        return { data: filteredExpenses(advanceExpenses), total: (Array.isArray(advanceExpenses) ? advanceExpenses : []).reduce((sum, e) => sum + e.amount, 0) }
       case "salary":
-        return { data: filteredExpenses(salaryExpenses), total: salaryExpenses.reduce((sum, e) => sum + e.amount, 0) }
+        return { data: filteredExpenses(salaryExpenses), total: (Array.isArray(salaryExpenses) ? salaryExpenses : []).reduce((sum, e) => sum + e.amount, 0) }
       case "all":
       default:
-        return { data: filteredExpenses(allExpenses), total: allExpenses.reduce((sum, e) => sum + e.amount, 0) }
+        return { data: filteredExpenses(allExpenses), total: (Array.isArray(allExpenses) ? allExpenses : []).reduce((sum, e) => sum + e.amount, 0) }
     }
   }
 

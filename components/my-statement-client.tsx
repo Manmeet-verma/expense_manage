@@ -383,10 +383,10 @@ export function MyStatementClient({ userId }: MyStatementClientProps) {
     setTimeout(() => setPendingActionSuccess(""), 2500)
   }
 
-  const approvedTotal = approvedExpenses.reduce((sum, exp) => sum + exp.amount, 0)
-  const rejectedTotal = rejectedExpenses.reduce((sum, exp) => sum + exp.amount, 0)
-  const pendingTotal = pendingExpenses.reduce((sum, exp) => sum + exp.amount, 0)
-  const pendingCollectionTotal = pendingFunds.reduce((sum, f) => sum + f.amount, 0)
+  const approvedTotal = (Array.isArray(approvedExpenses) ? approvedExpenses : []).reduce((sum, exp) => sum + exp.amount, 0)
+  const rejectedTotal = (Array.isArray(rejectedExpenses) ? rejectedExpenses : []).reduce((sum, exp) => sum + exp.amount, 0)
+  const pendingTotal = (Array.isArray(pendingExpenses) ? pendingExpenses : []).reduce((sum, exp) => sum + exp.amount, 0)
+  const pendingCollectionTotal = (Array.isArray(pendingFunds) ? pendingFunds : []).reduce((sum, f) => sum + f.amount, 0)
   const currentExpenses = activeTab === "approved" ? approvedExpenses : activeTab === "rejected" ? rejectedExpenses : activeTab === "pending" ? pendingExpenses : []
   const currentTotal = activeTab === "approved" ? approvedTotal : activeTab === "rejected" ? rejectedTotal : activeTab === "pending" ? pendingTotal : pendingCollectionTotal
 
